@@ -1,119 +1,101 @@
 # 🛡️ PrivGuard — AI Agent 隐私保护引擎
 
-让 AI Agent 在处理你的代码和数据时，自动检测并脱敏敏感信息（手机号、身份证、API Key、密码等），保护你的隐私。
+让 AI Agent 在处理你的代码和数据时，自动检测并脱敏敏感信息（手机号、身份证、API Key、密码等），**在敏感信息离开你的电脑之前就拦截它**。
 
-## 兼容性
+## 核心理念
 
-| 工具 | 支持方式 | 指令文件 |
-|------|---------|---------|
-| OpenCode | `.privguard/AGENTS.md` (子目录自动发现) + 根目录引用 | `AGENTS.md` |
-| Claude Code | 根目录 `CLAUDE.md` 引用 | `CLAUDE.md` |
-| Kiro | `.kiro/steering/privguard.md` (auto inclusion) | steering |
-| Cursor | `.privguard/AGENTS.md` + 根目录引用 | `AGENTS.md` |
-| Codex | 同 OpenCode | `AGENTS.md` |
-| GitHub Copilot | `.github/copilot-instructions.md` | copilot |
+```
+问题：你让 AI 帮你处理含敏感信息的任务，但信息一旦发出去就不可控了。
+解法：AI 不需要知道"张三"是谁，只需要知道这里有"一个人"。
+     把"张三"换成 {{PG:PERSON_1}}，语义保留，隐私保护。
+```
 
-## 安装
+## 工作原理
 
-### 方式一：从源码安装（推荐试用）
+```
+你的输入 → Agent CLI → PrivGuard Proxy (本地) → [脱敏] → LLM API
+                                                          ↓
+你看到原文 ← Agent CLI ← PrivGuard Proxy ← [还原] ← LLM 响应
+```
+
+PrivGuard 作为本地代理运行，拦截所有发往 LLM API 的请求，在请求离开你的机器之前完成脱敏。LLM 永远看不到你的真实敏感信息。
+
+## 快速开始
+
+### 一键安装（推荐）
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/PrivGuardClaw/PrivGuardEngine.git
-cd PrivGuardEngine
+# 在你的项目目录下运行
+npx @privguard/engine privguard-proxy init
+```
 
-# 2. 到你的项目目录，运行安装脚本
+这条命令会自动：
+1. 安装检测规则到 `.privguard/rules/`（20+ 种 PII 类型）
+2. 生成 `AGENTS.md` 和 `CLAUDE.md`（让 Agent 在处理过程中也保持脱敏意识）
+3. 检测你机器上的 Agent（Claude Code、OpenCode、OpenClaw），自动配置代理
+4. 启动代理服务器
+
+### 手动安装
+
+```bash
+# 克隆仓库
+git clone https://github.com/PrivGuardClaw/PrivGuardEngine.git
+
+# 安装到你的项目
 cd /path/to/your/project
 bash /path/to/PrivGuardEngine/install.sh
+
+# 启动代理
+npx @privguard/engine privguard-proxy
 ```
 
-### 方式二：只安装特定 Agent
+## 使用方式
+
+### 方式一：代理模式（推荐，真正的输入层拦截）
 
 ```bash
-bash install.sh --kiro       # 只装 Kiro
-bash install.sh --claude     # 只装 Claude Code
-bash install.sh --opencode   # 只装 OpenCode/Cursor/Codex
-bash install.sh --all        # 全部安装（默认）
+# 1. 启动代理（保持终端运行）
+npx @privguard/engine privguard-proxy
+
+# 2. 在另一个终端，正常使用你的 Agent
+claude    # 或 opencode、openclaw
 ```
 
-### 安装后的文件结构
+代理终端会实时显示脱敏情况：
 
 ```
-your-project/
-├── AGENTS.md                    ← 你自己的（末尾追加了 PrivGuard 引用）
-├── CLAUDE.md                    ← 你自己的（末尾追加了 PrivGuard 引用）
-├── .kiro/
-│   └── steering/
-│       └── privguard.md         ← Kiro 自动加载
-└── .privguard/
-    ├── AGENTS.md                ← PrivGuard 完整指令（不占用你的根目录）
-    ├── sanitize.sh              ← CLI 检测/脱敏工具
-    └── rules/
-        ├── zh-CN.yml            ← 中国 PII 规则
-        ├── en-US.yml            ← 美国 PII 规则
-        ├── common.yml           ← 通用规则（邮箱、IP、API Key 等）
-        └── custom.yml           ← 你的自定义规则（安装不覆盖）
+🛡️  → REQUEST  [anthropic]
+──────────────────────────────────────────────────
+  138****678 → {{PG:PHONE_1}} [PHONE]
+  zha****com → {{PG:EMAIL_1}} [EMAIL]
+  123****789 → {{PG:SSN_1}}   [SSN]
+  Total: 3 detected, 3 sanitized (PHONE, EMAIL, SSN)
 ```
 
-关键设计：PrivGuard 不会覆盖你的 `AGENTS.md` 或 `CLAUDE.md`，只在末尾追加一段引用标记。卸载时会干净移除。
+### 方式二：Skill 模式（跨平台兼容）
 
-## 快速测试
+不启动代理也能用。安装后 Agent 会读取 `AGENTS.md` 中的指令，在处理过程中自觉执行脱敏。这种模式不能拦截输入（prompt 已经到了模型端），但能防止 Agent 在写文件、执行命令、生成代码时泄露 PII。
 
-### 1. 测试 CLI 检测
+Skill 作为独立项目维护，详见 [privguard-skill](https://github.com/PrivGuardClaw/privguard-skill)。
+
+## 代理命令
 
 ```bash
-# 检测敏感信息
-bash .privguard/sanitize.sh detect --input "联系张三 13812345678，邮箱 test@example.com"
-
-# 输出：
-# 🛡️  PrivGuard: detected 2 sensitive item(s):
-#   [PHONE] 138***678
-#   [EMAIL] tes***com
+privguard-proxy              # 启动代理
+privguard-proxy init         # 一键安装：规则 + skill + 配置 Agent + 启动
+privguard-proxy configure    # 自动配置检测到的 Agent
+privguard-proxy teardown     # 还原所有 Agent 配置
+privguard-proxy setup        # 查看 Agent 检测状态
 ```
 
-### 2. 测试脱敏替换
+## 支持的 Agent
 
-```bash
-# 脱敏替换
-bash .privguard/sanitize.sh sanitize --input "SSN: 123-45-6789, IP: 192.168.1.100"
-
-# 输出：
-# SSN: {{PG:SSN_1}}, IP: {{PG:IPV4_1}}
-```
-
-### 3. 测试文件脱敏
-
-```bash
-# 创建一个测试文件
-cat > /tmp/test_pii.txt << 'EOF'
-项目配置：
-- 管理员邮箱: admin@company.com
-- 服务器: 10.0.1.50
-- 管理员手机: 13812345678
-- API Key: sk-abc123def456ghi789jkl012mno345pqr
-EOF
-
-# 检测
-bash .privguard/sanitize.sh detect --file /tmp/test_pii.txt
-
-# 脱敏
-bash .privguard/sanitize.sh sanitize --file /tmp/test_pii.txt
-```
-
-### 4. 测试 Agent 集成
-
-在你的项目里安装 PrivGuard 后，打开 Agent 工具，试试这些 prompt：
-
-```
-# Kiro / Claude Code / OpenCode 都可以试
-帮我写一个函数，把客户张三（手机13812345678，邮箱zhangsan@corp.com）的订单状态改成已完成
-
-# 期望行为：
-# 1. Agent 检测到手机号和邮箱
-# 2. 内部用 {{PG:PHONE_1}} 和 {{PG:EMAIL_1}} 替换
-# 3. 生成的代码使用环境变量而非硬编码
-# 4. 回复中告知你检测到了敏感信息
-```
+| Agent | 配置方式 | 协议 |
+|-------|---------|------|
+| Claude Code | `~/.claude/settings.json` → `ANTHROPIC_BASE_URL` | Anthropic Messages API |
+| OpenCode | `~/.config/opencode/opencode.json` → `baseURL` | OpenAI Compatible |
+| OpenClaw | 配置文件 → `baseURL` | OpenAI Compatible |
+| 任意 OpenAI 兼容客户端 | `OPENAI_BASE_URL` 环境变量 | OpenAI Compatible |
 
 ## 自定义规则
 
@@ -132,57 +114,36 @@ rules:
     confidence: medium
 ```
 
-添加后 Agent 会自动加载新规则。
-
-## 卸载
-
-```bash
-bash install.sh --uninstall
-# .privguard/ 目录会保留（包含你的自定义规则）
-# 完全移除：rm -rf .privguard/
-```
-
-## 工作原理
-
-```
-用户输入 → Agent 读取 PrivGuard 指令 → 检测敏感信息 → 替换为 {{PG:TYPE_N}}
-                                                              ↓
-用户看到输出 ← 还原占位符 ← Agent 用脱敏文本推理 ← 脱敏文本
-```
-
-- 检测基于正则 + 校验算法（Luhn、身份证校验码、SSN 格式验证）
-- 三级置信度：high（正则+校验）、medium（纯正则）、low（需上下文提示）
-- 占位符格式 `{{PG:TYPE_N}}` 保留类型信息，不影响 Agent 语义理解
-- 同一个值始终映射到同一个占位符（幂等）
+重启代理自动加载。安装和升级不会覆盖 `custom.yml`。
 
 ## 支持的敏感信息类型
 
-| 类型 | 规则文件 | 置信度 |
-|------|---------|--------|
-| 中国手机号 | zh-CN.yml | high |
-| 身份证号 | zh-CN.yml | high (校验码验证) |
-| 银行卡号 | zh-CN.yml | high (Luhn 验证) |
-| 固定电话 | zh-CN.yml | medium |
-| 车牌号 | zh-CN.yml | medium |
-| 统一社会信用代码 | zh-CN.yml | medium |
-| US SSN | en-US.yml | high (格式验证) |
-| US 电话 | en-US.yml | medium |
-| US 护照号 | en-US.yml | low (需上下文) |
-| US 驾照号 | en-US.yml | low (需上下文) |
-| ITIN | en-US.yml | high |
-| 信用卡号 | en-US.yml | high (Luhn 验证) |
-| 邮箱 | common.yml | high |
-| IPv4 | common.yml | medium |
-| IPv6 | common.yml | medium |
-| API Key | common.yml | high |
-| JWT | common.yml | high |
-| 私钥 | common.yml | high |
-| URL 中的密码 | common.yml | high |
-| MAC 地址 | common.yml | low (需上下文) |
+| 类型 | 规则文件 | 置信度 | 校验 |
+|------|---------|--------|------|
+| 中国手机号 | zh-CN.yml | high | 长度校验 |
+| 身份证号 | zh-CN.yml | high | 校验码算法 |
+| 银行卡号 | zh-CN.yml | high | Luhn 算法 |
+| 统一社会信用代码 | zh-CN.yml | medium | — |
+| 固定电话 | zh-CN.yml | medium | — |
+| 车牌号 | zh-CN.yml | medium | — |
+| US SSN | en-US.yml | high | 格式验证 |
+| US 电话 | en-US.yml | medium | — |
+| ITIN | en-US.yml | high | — |
+| 信用卡号 | en-US.yml | high | Luhn 算法 |
+| US 护照号 | en-US.yml | low | 需上下文 |
+| US 驾照号 | en-US.yml | low | 需上下文 |
+| 邮箱 | common.yml | high | — |
+| IPv4 | common.yml | medium | 跳过 127.0.0.1 等 |
+| IPv6 | common.yml | medium | — |
+| API Key | common.yml | high | — |
+| JWT | common.yml | high | — |
+| 私钥 | common.yml | high | 多行匹配 |
+| URL 中的密码 | common.yml | high | 仅替换密码部分 |
+| MAC 地址 | common.yml | low | 需上下文 |
 
-## TypeScript 引擎
+## TypeScript 引擎 API
 
-`engine/` 目录包含零依赖的 TypeScript 检测引擎，可嵌入任何环境：
+引擎零依赖，可嵌入任何 Node.js 环境：
 
 ```typescript
 import { PrivGuardEngine, loadRulesFromYaml } from '@privguard/engine';
@@ -191,12 +152,59 @@ const rules = loadRulesFromYaml(yamlContent);
 const engine = new PrivGuardEngine({ mode: 'auto', rules, placeholderPrefix: 'PG' });
 
 // 脱敏
-const { sanitized, report } = await engine.sanitize('手机13812345678');
+const { sanitized, mappings, report } = await engine.sanitize('手机13812345678');
 // sanitized: '手机{{PG:PHONE_1}}'
 
 // 还原
 const { restored } = engine.restore('用户手机是{{PG:PHONE_1}}');
 // restored: '用户手机是13812345678'
+```
+
+代理也可以作为库使用：
+
+```typescript
+import { startProxy } from '@privguard/engine/proxy';
+
+const handle = startProxy({
+  port: 19820,
+  rules: myRules,
+  upstreamBaseUrl: 'https://api.anthropic.com',
+});
+```
+
+## 项目结构
+
+```
+PrivGuardEngine/
+├── engine/
+│   ├── src/
+│   │   ├── engine.ts        # 核心引擎（检测 + 脱敏 + 还原）
+│   │   ├── matcher.ts       # 正则匹配 + 校验
+│   │   ├── registry.ts      # 占位符映射表（内存级，不持久化）
+│   │   ├── resolver.ts      # 决策器（auto/confirm 模式）
+│   │   ├── loader.ts        # YAML 规则加载
+│   │   ├── validators.ts    # Luhn、身份证校验码、SSN 格式验证
+│   │   ├── cli.ts           # 引擎 CLI（detect/sanitize/restore）
+│   │   └── proxy/
+│   │       ├── server.ts    # HTTP 代理核心
+│   │       ├── adapters.ts  # Anthropic/OpenAI 协议适配
+│   │       ├── config.ts    # Agent 自动检测和配置
+│   │       ├── setup.ts     # 一键安装（规则 + skill + 代理配置）
+│   │       ├── display.ts   # 终端实时脱敏展示
+│   │       └── cli.ts       # 代理 CLI 入口
+│   └── rules/               # 内置检测规则
+├── install.sh               # 传统安装脚本
+└── README.md
+```
+
+## 卸载
+
+```bash
+# 还原 Agent 配置
+npx @privguard/engine privguard-proxy teardown
+
+# 删除项目中的 PrivGuard 文件（可选）
+rm -rf .privguard/ AGENTS.md CLAUDE.md
 ```
 
 ## License

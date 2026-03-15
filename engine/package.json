@@ -1,18 +1,26 @@
 {
   "name": "@privguard/engine",
-  "version": "0.1.0",
-  "description": "Zero-dependency PII detection and sanitization engine",
+  "version": "0.2.0",
+  "description": "Zero-dependency PII detection and sanitization engine with local proxy",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "privguard-proxy": "dist/proxy/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./proxy": {
+      "types": "./dist/proxy/index.d.ts",
+      "import": "./dist/proxy/index.js"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "rules"
   ],
   "scripts": {
     "build": "tsc",

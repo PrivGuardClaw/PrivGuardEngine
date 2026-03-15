@@ -1,0 +1,62 @@
+# PrivGuard Common Sensitive Information Rules
+# Version: 1.0
+# Locale: universal
+
+rules:
+  - type: EMAIL
+    name: Email Address
+    pattern: '([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})'
+    confidence: high
+    examples:
+      - input: "Email: user@example.com"
+        match: "user@example.com"
+
+  - type: IPV4
+    name: IPv4 Address
+    pattern: '\b((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))\b'
+    confidence: medium
+    skip_values: ["127.0.0.1", "0.0.0.0", "255.255.255.255"]
+    examples:
+      - input: "Server: 192.168.1.100"
+        match: "192.168.1.100"
+      - input: "Localhost: 127.0.0.1"
+        match: null
+
+  - type: IPV6
+    name: IPv6 Address
+    pattern: '((?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4})'
+    confidence: medium
+
+  - type: API_KEY
+    name: API Key / Secret Key
+    pattern: '(?i)((?:sk|ak|key|token|secret|password|api[_-]?key)[-_][a-zA-Z0-9_-]{20,})'
+    confidence: high
+    examples:
+      - input: "OPENAI_API_KEY=sk-abc123def456ghi789jkl012mno345"
+        match: "sk-abc123def456ghi789jkl012mno345"
+
+  - type: PRIVATE_KEY
+    name: Private Key Block
+    pattern: '(-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----)'
+    confidence: high
+    multiline: true
+
+  - type: JWT
+    name: JSON Web Token
+    pattern: '(eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,})'
+    confidence: high
+
+  - type: PASSWORD_IN_URL
+    name: Password in URL/Connection String
+    pattern: '(?i)((?:mysql|postgres|mongodb|redis|amqp|ftp|https?):\/\/[^:]+:)([^@\s]+)(@)'
+    confidence: high
+    capture_group: 2
+    examples:
+      - input: "postgres://admin:s3cret@db.host:5432/mydb"
+        match: "s3cret"
+
+  - type: MAC_ADDRESS
+    name: MAC Address
+    pattern: '((?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})'
+    confidence: low
+    context_hint: "mac|MAC|address|网卡"

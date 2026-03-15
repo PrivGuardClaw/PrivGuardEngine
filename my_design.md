@@ -39,7 +39,7 @@
   这个 skill 内化在它的 system prompt / instruction 里
 ```
 
-**所以 Skill 的最佳���态是：一段足够清晰的指令，让 Agent "学会"一个行为模式。**
+**所以 Skill 的最佳形态是：一段足够清晰的指令，让 Agent "学会"一个行为模式。**
 
 ### 0.3 谁是 Skill 的消费者？
 
