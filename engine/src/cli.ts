@@ -18,7 +18,7 @@ import { PrivGuardEngine } from './engine.js';
 import { loadAllRules } from './loader.js';
 import type { Rule, MappingEntry } from './types.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 // ── Parse CLI args ──
 const args = process.argv.slice(2);
@@ -103,6 +103,8 @@ async function doSanitize() {
   const engine = new PrivGuardEngine({ mode, rules, placeholderPrefix: 'PG' });
   const result = await engine.sanitize(input);
 
+  const diffs = generateAllDiffs(input, result.sanitized, result.mappings);
+
   console.log(JSON.stringify({
     sanitized: result.sanitized,
     mappings: result.mappings,
@@ -117,7 +119,9 @@ async function doSanitize() {
         action: i.action,
       })),
     },
-    diff: generateDiff(input, result.sanitized, result.mappings),
+    diff: diffs.plain,
+    diffAnsi: diffs.ansi,
+    diffMarkdown: diffs.markdown,
   }, null, 2));
 }
 
@@ -159,43 +163,127 @@ async function doDetect() {
   }, null, 2));
 }
 
-// ── Diff generation (word-level for better readability) ──
+// ── ANSI color codes ──
+const ANSI = {
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  cyan: '\x1b[36m',
+  dim: '\x1b[2m',
+  bold: '\x1b[1m',
+  reset: '\x1b[0m',
+  bgRed: '\x1b[41m',
+  bgGreen: '\x1b[42m',
+  strikethrough: '\x1b[9m',
+};
 
-function generateDiff(original: string, sanitized: string, mappings: MappingEntry[]): string {
-  if (mappings.length === 0) return '';
+// ── Diff generation ──
 
-  const lines: string[] = ['--- original', '+++ sanitized', ''];
+interface DiffOutput {
+  plain: string;
+  ansi: string;
+  markdown: string;
+}
 
-  // Build a reverse map: placeholder → originalValue
-  const phMap = new Map<string, string>();
-  for (const m of mappings) phMap.set(m.placeholder, m.originalValue);
+function buildReplacementMap(mappings: MappingEntry[]): Map<string, MappingEntry> {
+  const map = new Map<string, MappingEntry>();
+  for (const m of mappings) map.set(m.placeholder, m);
+  return map;
+}
 
+function generateAllDiffs(original: string, sanitized: string, mappings: MappingEntry[]): DiffOutput {
+  if (mappings.length === 0) return { plain: '', ansi: '', markdown: '' };
+
+  const phMap = buildReplacementMap(mappings);
   const origLines = original.split('\n');
   const sanLines = sanitized.split('\n');
   const maxLines = Math.max(origLines.length, sanLines.length);
+
+  const plain: string[] = ['--- original', '+++ sanitized', ''];
+  const ansi: string[] = [
+    `${ANSI.bold}🛡️ PrivGuard Diff${ANSI.reset}`,
+    `${ANSI.dim}${'─'.repeat(60)}${ANSI.reset}`,
+  ];
+  const md: string[] = ['🛡️ **PrivGuard Diff**', '', '```diff'];
 
   for (let i = 0; i < maxLines; i++) {
     const orig = origLines[i] ?? '';
     const san = sanLines[i] ?? '';
     if (orig === san) continue;
 
-    lines.push(`@@ line ${i + 1} @@`);
-    lines.push(`- ${orig}`);
-    lines.push(`+ ${san}`);
+    // Plain
+    plain.push(`@@ line ${i + 1} @@`);
+    plain.push(`- ${orig}`);
+    plain.push(`+ ${san}`);
 
-    // Show inline replacements for this line
+    // ANSI — inline highlight: color the changed parts within the line
+    ansi.push(`${ANSI.dim}@@ line ${i + 1} @@${ANSI.reset}`);
+    ansi.push(`${ANSI.red}- ${highlightOriginalAnsi(orig, san, phMap)}${ANSI.reset}`);
+    ansi.push(`${ANSI.green}+ ${highlightSanitizedAnsi(san, phMap)}${ANSI.reset}`);
+
+    // Markdown
+    md.push(`@@ line ${i + 1} @@`);
+    md.push(`- ${orig}`);
+    md.push(`+ ${san}`);
+
+    // Inline annotations
     const placeholderRe = /\{\{PG:[A-Z0-9_]+_\d+\}\}/g;
     let pm: RegExpExecArray | null;
     while ((pm = placeholderRe.exec(san)) !== null) {
       const ph = pm[0];
-      const origVal = phMap.get(ph);
-      if (origVal) {
-        lines.push(`  ^ ${origVal} → ${ph}`);
+      const entry = phMap.get(ph);
+      if (entry) {
+        plain.push(`  ^ ${entry.originalValue} → ${ph}`);
+        ansi.push(`  ${ANSI.cyan}↳${ANSI.reset} ${ANSI.red}${ANSI.strikethrough}${entry.originalValue}${ANSI.reset} → ${ANSI.green}${ANSI.bold}${ph}${ANSI.reset} ${ANSI.dim}[${entry.type}]${ANSI.reset}`);
       }
     }
   }
 
-  return lines.join('\n');
+  md.push('```', '');
+
+  // Markdown replacement table
+  md.push('| 原始值 | 占位符 | 类型 |');
+  md.push('|--------|--------|------|');
+  for (const m of mappings) {
+    md.push(`| ~~${m.originalValue}~~ | \`${m.placeholder}\` | ${m.type} |`);
+  }
+
+  // ANSI summary
+  ansi.push(`${ANSI.dim}${'─'.repeat(60)}${ANSI.reset}`);
+  ansi.push(`${ANSI.bold}${mappings.length} 项替换${ANSI.reset}:`);
+  for (const m of mappings) {
+    ansi.push(`  ${ANSI.red}${ANSI.strikethrough}${m.originalValue}${ANSI.reset} → ${ANSI.green}${m.placeholder}${ANSI.reset} ${ANSI.dim}[${m.type}]${ANSI.reset}`);
+  }
+
+  return {
+    plain: plain.join('\n'),
+    ansi: ansi.join('\n'),
+    markdown: md.join('\n'),
+  };
+}
+
+/** Highlight original sensitive values in red+bold within the original line */
+function highlightOriginalAnsi(origLine: string, sanLine: string, phMap: Map<string, MappingEntry>): string {
+  let result = origLine;
+  // Find all original values that were replaced, highlight them
+  for (const [, entry] of phMap) {
+    const val = entry.originalValue;
+    if (origLine.includes(val)) {
+      result = result.split(val).join(`${ANSI.bold}${ANSI.bgRed} ${val} ${ANSI.reset}${ANSI.red}`);
+    }
+  }
+  return result;
+}
+
+/** Highlight placeholders in green+bold within the sanitized line */
+function highlightSanitizedAnsi(sanLine: string, phMap: Map<string, MappingEntry>): string {
+  let result = sanLine;
+  for (const [ph] of phMap) {
+    if (sanLine.includes(ph)) {
+      result = result.split(ph).join(`${ANSI.bold}${ANSI.bgGreen} ${ph} ${ANSI.reset}${ANSI.green}`);
+    }
+  }
+  return result;
 }
 
 // ── Main ──
