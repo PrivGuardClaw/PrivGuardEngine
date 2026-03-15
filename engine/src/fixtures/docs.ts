@@ -51,9 +51,11 @@ export const TEST_DOCS: TestDoc[] = [
     id: 3,
     name: '数据库连接串中的密码',
     content: '我们的数据库连接串是 postgres://admin:SuperSecret123@db.prod.internal:5432/myapp，帮我写一个连接池配置。',
-    expectedDetections: [],  // EMAIL pattern won't match inside URL, no direct PII
-    simulatedLLMResponse: '建议使用环境变量管理数据库连接：\n\n```python\nimport os\nDB_URL = os.environ["DATABASE_URL"]\n```\n\n不要在代码中硬编码连接串。',
-    expectedRestoredContains: ['环境变量', 'DATABASE_URL'],
+    expectedDetections: [
+      { type: 'PASSWORD_IN_URL', value: 'SuperSecret123' },
+    ],
+    simulatedLLMResponse: '建议使用环境变量管理数据库连接：\n\n```python\nimport os\nDB_URL = os.environ["DATABASE_URL"]\n```\n\n密码 {{PG:PASSWORD_IN_URL_1}} 不要在代码中硬编码连接串。',
+    expectedRestoredContains: ['环境变量', 'DATABASE_URL', 'SuperSecret123'],
   },
 
   // ── 4. API Key 泄露 ──

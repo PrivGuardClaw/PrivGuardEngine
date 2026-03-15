@@ -45,6 +45,13 @@ export function match(text: string, rules: Rule[]): Candidate[] {
       // skip_values check
       if (rule.skip_values?.includes(value)) continue;
 
+      // Skip EMAIL matches that are inside a URL password position
+      // e.g. postgres://admin:SuperSecret123@db.prod.internal
+      if (rule.type === 'EMAIL') {
+        const before = text.substring(Math.max(0, m.index - 200), m.index);
+        if (/:[/][/][^@]*:$/.test(before)) continue;
+      }
+
       // Validation check
       if (rule.validate) {
         const validator = getValidator(rule.validate);

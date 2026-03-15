@@ -52,7 +52,7 @@ describe('Dimension 1: Sanitization Correctness', () => {
       }
 
       // Sanitized text should contain well-formed placeholders
-      const placeholderRe = /\{\{PG:[A-Z_]+_\d+\}\}/g;
+      const placeholderRe = /\{\{PG:[A-Z0-9_]+_\d+\}\}/g;
       const placeholders = result.sanitized.match(placeholderRe) || [];
       assert.ok(
         placeholders.length > 0,
@@ -110,7 +110,7 @@ describe('Dimension 2: Restore Correctness (LLM response parsing)', () => {
       // No orphan placeholders outside code blocks (for docs with detections)
       if (doc.expectedDetections.length > 0) {
         const textOutsideCode = removeCodeBlocks(restored);
-        const orphans = textOutsideCode.match(/\{\{PG:[A-Z_]+_\d+\}\}/g) || [];
+        const orphans = textOutsideCode.match(/\{\{PG:[A-Z0-9_]+_\d+\}\}/g) || [];
         assert.equal(
           orphans.length,
           0,
