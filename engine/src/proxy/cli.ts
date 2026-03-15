@@ -150,7 +150,7 @@ function handleStart(): void {
 
   displayInfo(`Loaded ${rules.length} detection rules.\n`);
 
-  const handle = startProxy({ port, rules, upstreamBaseUrl: upstream, verbose });
+  const handle = startProxy({ port, rules, upstreamBaseUrl: upstream, verbose, strict: hasFlag('strict') });
   setupShutdown(handle);
 }
 

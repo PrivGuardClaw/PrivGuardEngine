@@ -99,6 +99,10 @@ function extractAnthropicRequest(body: any): TextSegment[] {
           if (block.type === 'text' && block.text) {
             segments.push({ path: `messages.${mi}.content.${bi}.text`, text: block.text });
           }
+          // Fix #4: tool_use input — scan all string values in the input object
+          if (block.type === 'tool_use' && block.input && typeof block.input === 'object') {
+            extractObjectStrings(block.input, `messages.${mi}.content.${bi}.input`, segments);
+          }
           // Tool result content
           if (block.type === 'tool_result' && typeof block.content === 'string') {
             segments.push({ path: `messages.${mi}.content.${bi}.content`, text: block.content });
@@ -116,6 +120,28 @@ function extractAnthropicRequest(body: any): TextSegment[] {
   }
 
   return segments;
+}
+
+/**
+ * Fix #4: Recursively extract all string values from an object.
+ * Used to scan tool_use input for PII in any nested field.
+ */
+function extractObjectStrings(obj: any, basePath: string, segments: TextSegment[]): void {
+  if (typeof obj === 'string' && obj.length > 0) {
+    segments.push({ path: basePath, text: obj });
+    return;
+  }
+  if (Array.isArray(obj)) {
+    obj.forEach((item, i) => {
+      extractObjectStrings(item, `${basePath}.${i}`, segments);
+    });
+    return;
+  }
+  if (obj && typeof obj === 'object') {
+    for (const [key, value] of Object.entries(obj)) {
+      extractObjectStrings(value, `${basePath}.${key}`, segments);
+    }
+  }
 }
 
 function extractAnthropicResponse(body: any): TextSegment[] {

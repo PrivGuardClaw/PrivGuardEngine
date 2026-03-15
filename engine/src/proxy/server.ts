@@ -13,29 +13,37 @@
  *   - Anthropic Messages API (Claude Code)
  *   - OpenAI Chat Completions API (OpenCode, OpenClaw, Cursor, etc.)
  *   - Streaming (SSE) responses with real-time restoration
+ *
+ * Fixes applied:
+ *   - #1: Upstream URL auto-detected from saved agent config
+ *   - #2: Per-request registry isolation (no cross-request leaks)
+ *   - #3: Streaming placeholder buffering (handles truncated placeholders)
+ *   - #4: tool_use input scanning
  */
 import { createServer, request as httpRequest, IncomingMessage, ServerResponse } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 import { PrivGuardEngine } from '../engine.js';
-import type { Rule, MappingEntry } from '../types.js';
+import type { Rule } from '../types.js';
 import {
   detectFormat,
   extractRequestTexts,
   rewriteRequestTexts,
   extractResponseTexts,
   type ApiFormat,
-  type TextSegment,
 } from './adapters.js';
 import { displaySanitizeEvent, displayError, displayInfo } from './display.js';
+import { detectUpstreamUrl } from './config.js';
 
 export interface ProxyConfig {
   port: number;
   rules: Rule[];
-  /** If set, all requests are forwarded here. Otherwise, uses the original Host header. */
+  /** If set, all requests are forwarded here. Otherwise, auto-detect from saved agent config. */
   upstreamBaseUrl?: string;
   /** Show verbose logging */
   verbose?: boolean;
+  /** Strict mode: never show partial original values in terminal */
+  strict?: boolean;
 }
 
 /**
@@ -43,15 +51,18 @@ export interface ProxyConfig {
  * Returns a handle to stop it.
  */
 export function startProxy(config: ProxyConfig): { stop: () => void } {
-  const engine = new PrivGuardEngine({
-    mode: 'auto',
-    rules: config.rules,
-    placeholderPrefix: 'PG',
-  });
+  // Fix #1: Auto-detect upstream from saved agent config if not explicitly set
+  if (!config.upstreamBaseUrl) {
+    const detected = detectUpstreamUrl();
+    if (detected) {
+      config.upstreamBaseUrl = detected;
+      displayInfo(`Auto-detected upstream: ${detected}`);
+    }
+  }
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
-      await handleRequest(req, res, engine, config);
+      await handleRequest(req, res, config);
     } catch (err: any) {
       displayError(`Proxy error: ${err.message}`);
       if (!res.headersSent) {
@@ -83,9 +94,15 @@ export function startProxy(config: ProxyConfig): { stop: () => void } {
 async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  engine: PrivGuardEngine,
   config: ProxyConfig,
 ): Promise<void> {
+  // Fix #2: Create a per-request engine instance for registry isolation
+  const engine = new PrivGuardEngine({
+    mode: 'auto',
+    rules: config.rules,
+    placeholderPrefix: 'PG',
+  });
+
   // Read request body
   const bodyBuf = await readBody(req);
   const bodyStr = bodyBuf.toString('utf-8');
@@ -130,7 +147,9 @@ async function handleRequest(
       totalDetected: sanitizeItems.length,
       totalSanitized: sanitizeItems.length,
       types: [...new Set(sanitizeItems.map(i => i.type))],
-      items: sanitizeItems,
+      items: config.strict
+        ? sanitizeItems.map(i => ({ ...i, original: '****' }))
+        : sanitizeItems,
     });
   }
 
@@ -200,7 +219,11 @@ async function forwardAndRestore(
   res.end(responseBody);
 }
 
-/** Forward streaming (SSE) request, restore placeholders in each chunk */
+/**
+ * Fix #3: Forward streaming (SSE) request with placeholder buffering.
+ * Handles truncated placeholders that span multiple SSE chunks by
+ * buffering incomplete `{{PG:...` sequences until they close with `}}`.
+ */
 async function forwardStreaming(
   req: IncomingMessage,
   res: ServerResponse,
@@ -231,24 +254,28 @@ async function forwardStreaming(
       res.writeHead(proxyRes.statusCode || 200, respHeaders);
 
       // Stream data through, restoring placeholders in SSE events
-      let buffer = '';
+      let eventBuffer = '';
+      // Fix #3: Track incomplete placeholder across SSE events
+      let pendingText = '';
+
       proxyRes.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf-8');
+        eventBuffer += chunk.toString('utf-8');
 
         // Process complete SSE events (lines ending with \n\n)
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || ''; // Keep incomplete event in buffer
+        const events = eventBuffer.split('\n\n');
+        eventBuffer = events.pop() || ''; // Keep incomplete event in buffer
 
         for (const event of events) {
-          const restored = restoreSSEEvent(event, engine, format);
-          res.write(restored + '\n\n');
+          const restored = restoreSSEEvent(event, engine, format, pendingText);
+          pendingText = restored.pending;
+          res.write(restored.text + '\n\n');
         }
       });
 
       proxyRes.on('end', () => {
-        if (buffer) {
-          const restored = restoreSSEEvent(buffer, engine, format);
-          res.write(restored);
+        if (eventBuffer) {
+          const restored = restoreSSEEvent(eventBuffer, engine, format, pendingText);
+          res.write(restored.text);
         }
         res.end();
       });
@@ -272,11 +299,26 @@ async function forwardStreaming(
   proxyReq.end();
 }
 
-/** Restore placeholders in a single SSE event */
-function restoreSSEEvent(event: string, engine: PrivGuardEngine, format: ApiFormat): string {
-  // SSE format: "data: {json}\n" or "data: [DONE]\n"
+interface RestoreSSEResult {
+  text: string;
+  /** Incomplete placeholder fragment to carry over to next chunk */
+  pending: string;
+}
+
+/**
+ * Fix #3: Restore placeholders in a single SSE event, handling truncated placeholders.
+ * If a placeholder like `{{PG:PHONE_1}}` is split across chunks, the incomplete
+ * `{{PG:PHO` part is held in `pending` and prepended to the next chunk.
+ */
+function restoreSSEEvent(
+  event: string,
+  engine: PrivGuardEngine,
+  format: ApiFormat,
+  pendingFromPrev: string,
+): RestoreSSEResult {
   const lines = event.split('\n');
   const restored: string[] = [];
+  let pending = '';
 
   for (const line of lines) {
     if (line.startsWith('data: ') && line !== 'data: [DONE]') {
@@ -285,7 +327,15 @@ function restoreSSEEvent(event: string, engine: PrivGuardEngine, format: ApiForm
         const data = JSON.parse(jsonStr);
         const segments = extractResponseTexts(data, format);
         for (const seg of segments) {
-          const result = engine.restore(seg.text);
+          // Prepend any pending text from previous chunk
+          const fullText = pendingFromPrev + seg.text;
+          pendingFromPrev = ''; // Only use once
+
+          // Check for incomplete placeholder at end of text
+          const { clean, remainder } = splitIncomplete(fullText);
+          pending = remainder;
+
+          const result = engine.restore(clean);
           seg.text = result.restored;
         }
         rewriteRequestTexts(data, segments);
@@ -298,7 +348,34 @@ function restoreSSEEvent(event: string, engine: PrivGuardEngine, format: ApiForm
     }
   }
 
-  return restored.join('\n');
+  return { text: restored.join('\n'), pending };
+}
+
+/**
+ * Fix #3: Split text at an incomplete placeholder boundary.
+ * If text ends with an unclosed `{{PG:...` (no closing `}}`),
+ * split it so the incomplete part is buffered for the next chunk.
+ */
+function splitIncomplete(text: string): { clean: string; remainder: string } {
+  // Look for `{{` that doesn't have a matching `}}` after it
+  const lastOpen = text.lastIndexOf('{{');
+  if (lastOpen === -1) return { clean: text, remainder: '' };
+
+  const afterOpen = text.indexOf('}}', lastOpen);
+  if (afterOpen !== -1) {
+    // Found closing — check if there's another unclosed one after
+    const nextOpen = text.indexOf('{{', afterOpen + 2);
+    if (nextOpen === -1) return { clean: text, remainder: '' };
+    // Recurse on the tail
+    const tail = splitIncomplete(text.slice(nextOpen));
+    if (tail.remainder) {
+      return { clean: text.slice(0, nextOpen) + tail.clean, remainder: tail.remainder };
+    }
+    return { clean: text, remainder: '' };
+  }
+
+  // No closing `}}` found after the last `{{` — this is incomplete
+  return { clean: text.slice(0, lastOpen), remainder: text.slice(lastOpen) };
 }
 
 /** Forward raw (non-JSON) request */
@@ -344,16 +421,17 @@ async function forwardRaw(
 
 // ── Helpers ──
 
+/**
+ * Fix #1: Resolve upstream URL.
+ * Priority: explicit config > x-privguard-upstream header > saved agent config > Anthropic default
+ */
 function resolveUpstream(req: IncomingMessage, config: ProxyConfig): string {
   if (config.upstreamBaseUrl) {
-    // Append the original request path
     const base = config.upstreamBaseUrl.replace(/\/$/, '');
     return base + (req.url || '');
   }
 
-  // Try to reconstruct from original headers
-  // The agent sets base URL to our proxy, so we need the real upstream
-  // Check X-Forwarded-Host or fall back to Anthropic API
+  // Check custom header (set by some agent adapters)
   const forwardedHost = req.headers['x-privguard-upstream'] as string;
   if (forwardedHost) {
     return forwardedHost + (req.url || '');

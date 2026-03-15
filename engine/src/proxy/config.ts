@@ -130,16 +130,24 @@ export function configureClaudeCode(proxyUrl: string): ConfigureResult {
       writeFileSync(backupPath, raw, 'utf-8');
     }
 
-    // Set proxy URL
+    // Set proxy URL, preserving original base URL for upstream forwarding
     if (!config.env) config.env = {};
+    const currentUrl = config.env.ANTHROPIC_BASE_URL;
+    if (currentUrl && currentUrl !== proxyUrl && !config.env._PRIVGUARD_ORIGINAL_BASE_URL) {
+      config.env._PRIVGUARD_ORIGINAL_BASE_URL = currentUrl;
+    }
     config.env.ANTHROPIC_BASE_URL = proxyUrl;
 
     writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
 
+    const originalNote = config.env._PRIVGUARD_ORIGINAL_BASE_URL
+      ? ` (original: ${config.env._PRIVGUARD_ORIGINAL_BASE_URL})`
+      : '';
+
     return {
       agent: 'Claude Code',
       success: true,
-      message: `Configured ANTHROPIC_BASE_URL in ${configPath}`,
+      message: `Configured ANTHROPIC_BASE_URL in ${configPath}${originalNote}`,
       backupPath,
     };
   } catch (err: any) {
@@ -160,13 +168,20 @@ export function unconfigureClaudeCode(): ConfigureResult {
     }
 
     const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-    if (config?.env?.ANTHROPIC_BASE_URL) {
-      delete config.env.ANTHROPIC_BASE_URL;
+    if (config?.env) {
+      const originalUrl = config.env._PRIVGUARD_ORIGINAL_BASE_URL;
+      if (originalUrl) {
+        // Restore original base URL
+        config.env.ANTHROPIC_BASE_URL = originalUrl;
+        delete config.env._PRIVGUARD_ORIGINAL_BASE_URL;
+      } else {
+        delete config.env.ANTHROPIC_BASE_URL;
+      }
       if (Object.keys(config.env).length === 0) delete config.env;
       writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
     }
 
-    return { agent: 'Claude Code', success: true, message: `Removed ANTHROPIC_BASE_URL from ${configPath}` };
+    return { agent: 'Claude Code', success: true, message: `Restored ANTHROPIC_BASE_URL in ${configPath}` };
   } catch (err: any) {
     return { agent: 'Claude Code', success: false, message: `Failed: ${err.message}` };
   }
@@ -393,6 +408,48 @@ export function unconfigureOpenClaw(): ConfigureResult {
   } catch (err: any) {
     return { agent: 'OpenClaw', success: false, message: `Failed: ${err.message}` };
   }
+}
+
+// ── Read saved upstream URLs ──
+
+/** Get the original upstream URL for Claude Code (saved during configure) */
+export function getClaudeOriginalUpstream(): string | undefined {
+  const configPath = getClaudeConfigPath();
+  if (!existsSync(configPath)) return undefined;
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    return config?.env?._PRIVGUARD_ORIGINAL_BASE_URL || undefined;
+  } catch { return undefined; }
+}
+
+/** Get the original upstream URL for OpenCode (saved during configure) */
+export function getOpenCodeOriginalUpstream(): string | undefined {
+  const configPath = getOpenCodeConfigPath();
+  if (!existsSync(configPath)) return undefined;
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    if (config?.provider) {
+      for (const [, prov] of Object.entries(config.provider) as any) {
+        if (prov?.options?._originalBaseURL) return prov.options._originalBaseURL;
+      }
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+/** Get the original upstream URL for OpenClaw (saved during configure) */
+export function getOpenClawOriginalUpstream(): string | undefined {
+  const configPath = getOpenClawConfigPath();
+  if (!existsSync(configPath)) return undefined;
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    return config?.api?._originalBaseURL || undefined;
+  } catch { return undefined; }
+}
+
+/** Auto-detect the best upstream URL from configured agents */
+export function detectUpstreamUrl(): string | undefined {
+  return getClaudeOriginalUpstream() || getOpenCodeOriginalUpstream() || getOpenClawOriginalUpstream();
 }
 
 // ── Unified configure/unconfigure ──

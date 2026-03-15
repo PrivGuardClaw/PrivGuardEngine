@@ -27,6 +27,8 @@ export interface SanitizeEvent {
     original: string;
     placeholder: string;
   }>;
+  /** Fix #6: If true, original values are already masked as '****' */
+  strict?: boolean;
 }
 
 export function displayBanner(port: number, targetUrl: string): void {
