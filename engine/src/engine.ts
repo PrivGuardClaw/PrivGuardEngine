@@ -134,9 +134,6 @@ export class PrivGuardEngine {
     // Find code blocks to protect them
     const codeBlocks = findCodeBlocks(text);
 
-    // Find all placeholders
-    const placeholderRe = /\{\{PG:[A-Z_]+_\d+\}\}/g;
-    // Also support custom prefix
     const entries = this.registry.entries();
     if (entries.length === 0) {
       return { restored: text, codeBlocksPreserved: 0 };
@@ -199,6 +196,11 @@ export class PrivGuardEngine {
   /** Reset session (clear mappings, keep rules and decisions) */
   resetSession(): void {
     this.registry.clear();
+  }
+
+  /** Load mappings directly (for restore without re-sanitizing) */
+  loadMappings(mappings: import('./types.js').MappingEntry[]): void {
+    this.registry.loadMappings(mappings);
   }
 }
 

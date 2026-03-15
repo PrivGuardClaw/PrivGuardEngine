@@ -57,4 +57,19 @@ export class Registry {
   get size(): number {
     return this.forward.size;
   }
+
+  /** Load mappings directly (for restore without re-sanitizing) */
+  loadMappings(mappings: MappingEntry[]): void {
+    for (const m of mappings) {
+      this.forward.set(m.originalValue, m);
+      this.reverse.set(m.placeholder, m);
+      // Update counter to avoid collisions
+      const match = m.placeholder.match(/_(\d+)\}\}$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        const current = this.counters.get(m.type) ?? 0;
+        if (num > current) this.counters.set(m.type, num);
+      }
+    }
+  }
 }

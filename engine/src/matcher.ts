@@ -90,15 +90,30 @@ export function match(text: string, rules: Rule[]): Candidate[] {
 
 /**
  * Find the start index of a capture group within the full match.
- * RegExp doesn't give us group positions directly, so we search
- * for the captured string within the full match.
+ * Uses RegExp.prototype.indices (ES2022 'd' flag) when available,
+ * falls back to indexOf-based search.
  */
 function findCaptureStart(m: RegExpExecArray, groupIdx: number): number {
+  // If indices are available (d flag), use them for precision
+  if ((m as any).indices && (m as any).indices[groupIdx]) {
+    return (m as any).indices[groupIdx][0];
+  }
+
   const fullMatch = m[0];
   const captured = m[groupIdx];
   if (!captured) return m.index;
 
-  const offset = fullMatch.indexOf(captured);
+  // Fallback: search for captured string after all preceding groups
+  // to handle cases where the same substring appears multiple times
+  let searchFrom = 0;
+  for (let i = 1; i < groupIdx; i++) {
+    if (m[i]) {
+      const pos = fullMatch.indexOf(m[i], searchFrom);
+      if (pos >= 0) searchFrom = pos + m[i].length;
+    }
+  }
+
+  const offset = fullMatch.indexOf(captured, searchFrom);
   return m.index + (offset >= 0 ? offset : 0);
 }
 
