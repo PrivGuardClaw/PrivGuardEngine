@@ -1,0 +1,26 @@
+{
+  "name": "@privguard/engine",
+  "version": "0.1.0",
+  "description": "Zero-dependency PII detection and sanitization engine",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  },
+  "keywords": ["pii", "sanitize", "privacy", "redact"],
+  "license": "MIT"
+}
