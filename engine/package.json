@@ -26,10 +26,11 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-gui-cjs.mjs",
     "build:skill": "node scripts/build-skill-cjs.mjs",
     "build:gui": "node scripts/build-gui-cjs.mjs",
-    "sync:skill": "node scripts/build-skill-cjs.mjs --sync && node scripts/build-gui-cjs.mjs --sync",
+    "sync:skill": "node scripts/build-skill-cjs.mjs --sync",
+    "prepublishOnly": "tsc && node scripts/build-gui-cjs.mjs",
     "test": "node --import tsx --test src/**/*.test.ts",
     "check": "tsc --noEmit"
   },

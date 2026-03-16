@@ -5,18 +5,15 @@
  *
  * Usage:
  *   node scripts/build-gui-cjs.mjs
- *   node scripts/build-gui-cjs.mjs --sync   # also copy to privguard-skill
  */
 import { build } from 'esbuild';
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { resolve, dirname, extname } from 'node:path';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const outfile = resolve(root, 'dist', 'privguard-gui.cjs');
-const skillDir = resolve(root, '..', '..', 'privguard-skill', 'privguard', 'scripts');
-const skillDest = resolve(skillDir, 'privguard-gui.cjs');
 
 mkdirSync(resolve(root, 'dist'), { recursive: true });
 
@@ -59,15 +56,3 @@ await build({
 });
 
 console.log(`✅ Built: ${outfile}`);
-
-const shouldSync = process.argv.includes('--sync');
-if (shouldSync) {
-  const skillRoot = resolve(root, '..', '..', 'privguard-skill');
-  if (!existsSync(skillRoot)) {
-    console.warn('⚠️  privguard-skill not found alongside PrivGuardEngine, skipping sync');
-  } else {
-    mkdirSync(skillDir, { recursive: true });
-    copyFileSync(outfile, skillDest);
-    console.log(`✅ Synced: ${skillDest}`);
-  }
-}
