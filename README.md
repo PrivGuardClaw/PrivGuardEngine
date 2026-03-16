@@ -91,6 +91,32 @@ privguard-proxy setup        # Show agent status
 privguard-proxy --help       # Show help
 ```
 
+### Web GUI
+
+PrivGuard includes a web-based management interface for viewing intercept logs and managing rules.
+
+```bash
+# Start GUI (also starts the proxy automatically)
+privguard-gui
+
+# Custom port
+privguard-gui --port 8080
+
+# Set a fixed password
+privguard-gui --password mypassword
+
+# GUI only, without starting the proxy
+privguard-gui --no-proxy
+```
+
+On first launch, a random password is generated and printed to the terminal. Open `http://localhost:19821` in your browser and enter the password to log in.
+
+**Features:**
+- Real-time intercept log viewer with PII type filtering
+- Custom rule editor with live regex testing
+- Proxy server status monitoring
+- Rule changes take effect instantly without restart
+
 ### Supported PII Types
 
 | Type | Rule File | Confidence | Validation |
@@ -228,6 +254,56 @@ privguard-proxy teardown     # 移除所有配置
 privguard-proxy setup        # 查看 Agent 状态
 privguard-proxy --help       # 显示帮助
 ```
+
+### Web 管理界面
+
+PrivGuard 内置 Web 管理界面，可可视化查看拦截记录、管理保护规则。
+
+```bash
+# 启动 GUI（同时自动启动代理）
+privguard-gui
+
+# 自定义端口
+privguard-gui --port 8080
+
+# 指定固定密码
+privguard-gui --password mypassword
+
+# 仅启动 GUI，不启动代理
+privguard-gui --no-proxy
+```
+
+首次启动时会自动生成随机密码并打印到终端。在浏览器中打开 `http://localhost:19821`，输入密码即可登录。
+
+**主要功能：**
+- 实时拦截记录查看，支持按 PII 类型筛选
+- 自定义规则编辑器，支持正则实时测试
+- 代理服务器状态监控
+- 规则修改即时生效，无需重启
+
+**首次使用步骤：**
+
+1. 运行 `privguard-gui`，终端会显示访问地址和密码：
+   ```
+   🛡️  PrivGuard GUI v0.1.0
+   ────────────────────────────────────────
+     管理界面:  http://localhost:19821
+     代理地址:  http://localhost:19820
+     访问密码:  Ab3xK9mP  (自动生成，请妥善保存)
+   ────────────────────────────────────────
+   ```
+2. 在浏览器中打开 `http://localhost:19821`
+3. 输入终端显示的密码登录
+4. 在「拦截记录」页面查看实时保护日志
+5. 在「规则管理」页面添加或修改自定义规则
+6. 在「代理状态」页面查看代理运行情况
+
+**常见问题：**
+
+- **端口被占用**：使用 `--port` 和 `--proxy-port` 指定其他端口
+- **忘记密码**：重启 `privguard-gui`，会生成新密码（或使用 `--password` 固定密码）
+- **规则不生效**：在「规则管理」页面点击「重新加载」，或保存规则后自动生效
+- **看不到拦截记录**：确认 AI Agent 已配置使用代理（`privguard-proxy configure`）
 
 ### 支持的敏感信息类型
 

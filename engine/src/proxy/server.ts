@@ -34,6 +34,9 @@ import {
 } from './adapters.js';
 import { displaySanitizeEvent, displayError, displayInfo } from './display.js';
 import { detectUpstreamUrl } from './config.js';
+import type { RecordStore } from '../gui/record-store.js';
+import { maskValue, truncate } from '../gui/utils.js';
+import { randomUUID } from 'node:crypto';
 
 export interface ProxyConfig {
   port: number;
@@ -44,6 +47,10 @@ export interface ProxyConfig {
   verbose?: boolean;
   /** Strict mode: never show partial original values in terminal */
   strict?: boolean;
+  /** Optional record store for GUI integration */
+  recordStore?: RecordStore;
+  /** Called on fatal server error instead of process.exit (GUI mode) */
+  onError?: (err: Error) => void;
 }
 
 /**
@@ -88,10 +95,20 @@ export function startProxy(config: ProxyConfig): { stop: () => void } {
 
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
-      displayError(`Port ${config.port} is already in use. Try: PRIVGUARD_PORT=19821 npx privguard-proxy`);
-      process.exit(1);
+      const msg = `Port ${config.port} is already in use. Try: PRIVGUARD_PORT=19821 npx privguard-proxy`;
+      if (config.onError) {
+        config.onError(Object.assign(err, { message: msg }));
+      } else {
+        displayError(msg);
+        process.exit(1);
+      }
+      return;
     }
-    displayError(`Server error: ${err.message}`);
+    if (config.onError) {
+      config.onError(err);
+    } else {
+      displayError(`Server error: ${err.message}`);
+    }
   });
 
   return {
@@ -156,6 +173,25 @@ async function handleRequest(
         ? sanitizeItems.map(i => ({ ...i, original: '****' }))
         : sanitizeItems,
     });
+
+    // Record to GUI store if available
+    if (config.recordStore) {
+      config.recordStore.add({
+        id: randomUUID(),
+        timestamp: Date.now(),
+        direction: 'request',
+        apiFormat: format as 'anthropic' | 'openai' | 'unknown',
+        detectedCount: sanitizeItems.length,
+        sanitizedCount: sanitizeItems.length,
+        piiTypes: [...new Set(sanitizeItems.map(i => i.type))],
+        items: sanitizeItems.map(i => ({
+          type: i.type,
+          masked: maskValue(i.original),
+          placeholder: i.placeholder,
+        })),
+        sanitizedPreview: truncate(JSON.stringify(body), 200),
+      });
+    }
   }
 
   const sanitizedBody = JSON.stringify(body);

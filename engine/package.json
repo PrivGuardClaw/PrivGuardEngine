@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "privguard-proxy": "dist/proxy/cli.js"
+    "privguard-proxy": "dist/proxy/cli.js",
+    "privguard-gui": "dist/privguard-gui.cjs"
   },
   "exports": {
     ".": {
@@ -27,7 +28,8 @@
   "scripts": {
     "build": "tsc",
     "build:skill": "node scripts/build-skill-cjs.mjs",
-    "sync:skill": "node scripts/build-skill-cjs.mjs --sync",
+    "build:gui": "node scripts/build-gui-cjs.mjs",
+    "sync:skill": "node scripts/build-skill-cjs.mjs --sync && node scripts/build-gui-cjs.mjs --sync",
     "test": "node --import tsx --test src/**/*.test.ts",
     "check": "tsc --noEmit"
   },
