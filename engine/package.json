@@ -1,7 +1,7 @@
 {
   "name": "@privguard/engine",
   "version": "0.2.0",
-  "description": "Zero-dependency PII detection and sanitization engine with local proxy",
+  "description": "Zero-dependency PII detection and sanitization engine with local proxy for AI agents",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,16 +20,26 @@
   },
   "files": [
     "dist",
-    "rules"
+    "rules",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc",
     "test": "node --import tsx --test src/**/*.test.ts",
     "check": "tsc --noEmit"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PrivGuardClaw/PrivGuardEngine.git"
+  },
+  "author": "PrivGuard Team",
+  "bugs": {
+    "url": "https://github.com/PrivGuardClaw/PrivGuardEngine/issues"
+  },
+  "homepage": "https://github.com/PrivGuardClaw/PrivGuardEngine#readme",
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "esbuild": "^0.27.4",
+    "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   },
@@ -37,7 +47,15 @@
     "pii",
     "sanitize",
     "privacy",
-    "redact"
+    "redact",
+    "proxy",
+    "ai-agent",
+    "claude",
+    "llm",
+    "sensitive-data"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

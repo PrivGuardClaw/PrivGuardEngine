@@ -252,7 +252,7 @@ Apply each rule's regex pattern to the text. For rules with \`validate\` field,
 perform additional validation (Luhn, checksum, etc.).
 
 ### Step 3: Replace
-Replace each detected entity with \`{{PG:TYPE_N}}\` placeholder:
+Replace each detected entity with \`<|PG:TYPE_N|>\` placeholder:
 - Same value → same placeholder (idempotent)
 - Different values of same type → increment N
 
@@ -271,7 +271,7 @@ Inform the user: "🛡️ PrivGuard: detected N sensitive items, sanitized durin
 1. NEVER send original sensitive values to external services
 2. Mapping table MUST only exist in local memory
 3. ALWAYS restore placeholders in final output (except code blocks)
-4. Use \`{{PG:TYPE_N}}\` format, not \`[REDACTED]\`
+4. Use \`<|PG:TYPE_N|>\` format, not \`[REDACTED]\` or \`{{...}}\`
 5. When uncertain, err on the side of sanitizing
 6. NEVER overwrite \`.privguard/rules/custom.yml\` during upgrades
 `;

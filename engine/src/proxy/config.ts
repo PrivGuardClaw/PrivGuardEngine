@@ -9,7 +9,7 @@
  * - Skill install: copy AGENTS.md / CLAUDE.md / rules into the right place
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { resolve, join, dirname } from 'node:path';
+import { join, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 
 export interface AgentInfo {
@@ -261,7 +261,7 @@ export function configureOpenCode(proxyUrl: string): ConfigureResult {
 
     // For each existing provider, wrap its baseURL
     let injected = false;
-    for (const [name, prov] of Object.entries(config.provider) as any) {
+    for (const prov of Object.values(config.provider) as any[]) {
       if (prov?.options?.baseURL && prov.options.baseURL !== proxyUrl) {
         // Save original URL as a header so proxy can forward to it
         if (!prov.options._originalBaseURL) {

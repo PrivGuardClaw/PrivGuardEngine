@@ -7,7 +7,7 @@
 ```
 问题：你让 AI 帮你处理含敏感信息的任务，但信息一旦发出去就不可控了。
 解法：AI 不需要知道"张三"是谁，只需要知道这里有"一个人"。
-     把"张三"换成 {{PG:PERSON_1}}，语义保留，隐私保护。
+     把"张三"换成 <|PG:PERSON_1|>，语义保留，隐私保护。
 ```
 
 ## 工作原理
@@ -66,9 +66,9 @@ claude    # 或 opencode、openclaw
 ```
 🛡️  → REQUEST  [anthropic]
 ──────────────────────────────────────────────────
-  138****678 → {{PG:PHONE_1}} [PHONE]
-  zha****com → {{PG:EMAIL_1}} [EMAIL]
-  123****789 → {{PG:SSN_1}}   [SSN]
+  138****678 → <|PG:PHONE_1|> [PHONE]
+  zha****com → <|PG:EMAIL_1|> [EMAIL]
+  123****789 → <|PG:SSN_1|>   [SSN]
   Total: 3 detected, 3 sanitized (PHONE, EMAIL, SSN)
 ```
 
@@ -153,10 +153,10 @@ const engine = new PrivGuardEngine({ mode: 'auto', rules, placeholderPrefix: 'PG
 
 // 脱敏
 const { sanitized, mappings, report } = await engine.sanitize('手机13812345678');
-// sanitized: '手机{{PG:PHONE_1}}'
+// sanitized: '手机<|PG:PHONE_1|>'
 
 // 还原
-const { restored } = engine.restore('用户手机是{{PG:PHONE_1}}');
+const { restored } = engine.restore('用户手机是<|PG:PHONE_1|>');
 // restored: '用户手机是13812345678'
 ```
 
