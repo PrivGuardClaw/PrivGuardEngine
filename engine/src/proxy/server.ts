@@ -60,9 +60,19 @@ export function startProxy(config: ProxyConfig): { stop: () => void } {
     }
   }
 
+  // Fix #5: Use a single engine instance per proxy session so mappings persist
+  // across multiple requests (e.g., Claude Code sends multiple API calls per turn).
+  // Per-request isolation was causing restoration failures when placeholders from
+  // request N appeared in the response of request N+1.
+  const engine = new PrivGuardEngine({
+    mode: 'auto',
+    rules: config.rules,
+    placeholderPrefix: 'PG',
+  });
+
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
-      await handleRequest(req, res, config);
+      await handleRequest(req, res, config, engine);
     } catch (err: any) {
       displayError(`Proxy error: ${err.message}`);
       if (!res.headersSent) {
@@ -95,13 +105,8 @@ async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
   config: ProxyConfig,
+  engine: PrivGuardEngine,
 ): Promise<void> {
-  // Fix #2: Create a per-request engine instance for registry isolation
-  const engine = new PrivGuardEngine({
-    mode: 'auto',
-    rules: config.rules,
-    placeholderPrefix: 'PG',
-  });
 
   // Read request body
   const bodyBuf = await readBody(req);
@@ -259,14 +264,21 @@ async function forwardStreaming(
       let pendingText = '';
 
       proxyRes.on('data', (chunk: Buffer) => {
-        eventBuffer += chunk.toString('utf-8');
+        const raw = chunk.toString('utf-8');
+        if (config.verbose) {
+          process.stderr.write(`[VERBOSE SSE RAW] ${JSON.stringify(raw)}\n`);
+        }
+        eventBuffer += raw;
 
         // Process complete SSE events (lines ending with \n\n)
         const events = eventBuffer.split('\n\n');
         eventBuffer = events.pop() || ''; // Keep incomplete event in buffer
 
         for (const event of events) {
-          const restored = restoreSSEEvent(event, engine, format, pendingText);
+          if (config.verbose) {
+            process.stderr.write(`[VERBOSE SSE EVENT] ${JSON.stringify(event)}\n`);
+          }
+          const restored = restoreSSEEvent(event, engine, format, pendingText, config.verbose);
           pendingText = restored.pending;
           res.write(restored.text + '\n\n');
         }
@@ -274,7 +286,7 @@ async function forwardStreaming(
 
       proxyRes.on('end', () => {
         if (eventBuffer) {
-          const restored = restoreSSEEvent(eventBuffer, engine, format, pendingText);
+          const restored = restoreSSEEvent(eventBuffer, engine, format, pendingText, config.verbose);
           res.write(restored.text);
         }
         res.end();
@@ -315,6 +327,7 @@ function restoreSSEEvent(
   engine: PrivGuardEngine,
   format: ApiFormat,
   pendingFromPrev: string,
+  verbose?: boolean,
 ): RestoreSSEResult {
   const lines = event.split('\n');
   const restored: string[] = [];
@@ -325,7 +338,15 @@ function restoreSSEEvent(
       const jsonStr = line.slice(6);
       try {
         const data = JSON.parse(jsonStr);
+        if (verbose) {
+          const deltaType = data.delta?.type ?? 'n/a';
+          const deltaText = data.delta?.text ?? data.delta?.thinking ?? '';
+          process.stderr.write(`[VERBOSE PARSED] type=${data.type} delta_type=${deltaType} text=${JSON.stringify(deltaText.slice(0, 40))}\n`);
+        }
         const segments = extractResponseTexts(data, format);
+        if (verbose) {
+          process.stderr.write(`[VERBOSE SEGMENTS] count=${segments.length} paths=${segments.map(s => s.path).join(',')}\n`);
+        }
         for (const seg of segments) {
           // Prepend any pending text from previous chunk
           const fullText = pendingFromPrev + seg.text;
@@ -335,7 +356,14 @@ function restoreSSEEvent(
           const { clean, remainder } = splitIncomplete(fullText);
           pending = remainder;
 
+          if (verbose && clean.includes('<|PG:')) {
+            process.stderr.write(`[VERBOSE RESTORE] found placeholder in: ${JSON.stringify(clean)}\n`);
+            process.stderr.write(`[VERBOSE RESTORE] registry size: ${engine.getMappings().length}\n`);
+          }
           const result = engine.restore(clean);
+          if (verbose && result.restored !== clean) {
+            process.stderr.write(`[VERBOSE RESTORE] restored: ${JSON.stringify(result.restored)}\n`);
+          }
           seg.text = result.restored;
         }
         rewriteRequestTexts(data, segments);

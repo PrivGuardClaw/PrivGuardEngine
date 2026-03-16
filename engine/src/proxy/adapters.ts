@@ -146,13 +146,31 @@ function extractObjectStrings(obj: any, basePath: string, segments: TextSegment[
 
 function extractAnthropicResponse(body: any): TextSegment[] {
   const segments: TextSegment[] = [];
+
+  // Non-streaming: full response with content array
   if (Array.isArray(body.content)) {
     body.content.forEach((block: any, i: number) => {
       if (block.type === 'text' && block.text) {
         segments.push({ path: `content.${i}.text`, text: block.text });
       }
     });
+    return segments;
   }
+
+  // Streaming: content_block_delta event
+  // { type: 'content_block_delta', delta: { type: 'text_delta', text: '...' } }
+  if (body.type === 'content_block_delta' && body.delta?.type === 'text_delta' && body.delta?.text) {
+    segments.push({ path: 'delta.text', text: body.delta.text });
+    return segments;
+  }
+
+  // Streaming: message_delta with stop reason (no text, skip)
+  // Streaming: content_block_start with initial text
+  if (body.type === 'content_block_start' && body.content_block?.type === 'text' && body.content_block?.text) {
+    segments.push({ path: 'content_block.text', text: body.content_block.text });
+    return segments;
+  }
+
   return segments;
 }
 

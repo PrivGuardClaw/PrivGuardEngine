@@ -5,13 +5,15 @@
 rules:
   - type: SSN
     name: Social Security Number
-    pattern: '(?<!\d)(\d{3}[-\s]?\d{2}[-\s]?\d{4})(?!\d)'
+    pattern: '(?<!\d)(\d{3}[-\s]\d{2}[-\s]\d{4})(?!\d)'
     confidence: high
     validate: ssn_format
     examples:
       - input: "SSN: 123-45-6789"
         match: "123-45-6789"
       - input: "SSN: 000-12-3456"
+        match: null
+      - input: "107495708@qq.com"
         match: null
 
   - type: US_PHONE
