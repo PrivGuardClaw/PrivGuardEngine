@@ -103,26 +103,42 @@ async function doSanitize() {
   const engine = new PrivGuardEngine({ mode, rules, placeholderPrefix: 'PG' });
   const result = await engine.sanitize(input);
 
-  const diffs = generateAllDiffs(input, result.sanitized, result.mappings);
+  // stdout: diff block for user display (rendered as red/green in OpenCode)
+  // JSON data is embedded as a comment line for agent parsing
+  if (result.mappings.length === 0) {
+    console.log('✅ PrivGuard: No sensitive information detected.');
+    return;
+  }
 
-  console.log(JSON.stringify({
+  const jsonPayload = JSON.stringify({
     sanitized: result.sanitized,
     mappings: result.mappings,
     report: {
       totalDetected: result.report.totalDetected,
       totalSanitized: result.report.totalSanitized,
       types: result.report.types,
-      items: result.report.items.map(i => ({
-        type: i.type,
-        placeholder: i.placeholder,
-        masked: i.masked,
-        action: i.action,
-      })),
     },
-    diff: diffs.plain,
-    diffAnsi: diffs.ansi,
-    diffMarkdown: diffs.markdown,
-  }, null, 2));
+  });
+
+  const diffLines: string[] = ['```diff'];
+  // embed JSON as a comment for agent to parse; invisible to user in rendered diff
+  diffLines.push(`# PRIVGUARD_DATA: ${jsonPayload}`);
+
+  const origLines = input.split('\n');
+  const sanLines = result.sanitized.split('\n');
+  const maxLines = Math.max(origLines.length, sanLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    const orig = origLines[i] ?? '';
+    const san = sanLines[i] ?? '';
+    if (orig !== san) {
+      diffLines.push(`- ${orig}`);
+      diffLines.push(`+ ${san}`);
+    }
+  }
+  diffLines.push('```');
+  diffLines.push('');
+  diffLines.push(`🛡️ PrivGuard: detected ${result.mappings.length} sensitive item(s) (${result.report.types.join(', ')})`);
+  console.log(diffLines.join('\n'));
 }
 
 async function doRestore() {

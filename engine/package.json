@@ -26,6 +26,8 @@
   ],
   "scripts": {
     "build": "tsc",
+    "build:skill": "node scripts/build-skill-cjs.mjs",
+    "sync:skill": "node scripts/build-skill-cjs.mjs --sync",
     "test": "node --import tsx --test src/**/*.test.ts",
     "check": "tsc --noEmit"
   },
