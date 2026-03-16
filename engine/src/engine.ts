@@ -140,8 +140,10 @@ export class PrivGuardEngine {
     }
 
     // Build a general placeholder regex from registry prefix
-    const prefix = entries[0]?.placeholder.match(/\{\{(\w+):/)?.[1] ?? 'PG';
-    const re = new RegExp(`\\{\\{${prefix}:[A-Z0-9_]+_\\d+\\}\\}`, 'g');
+    // Support both old format {{PG:TYPE_N}} and new format <|PG:TYPE_N|>
+    const prefix = entries[0]?.placeholder.match(/(?:\{\{|<\|)(\w+):/)?.[1] ?? 'PG';
+    // Match new format <|PG:TYPE_N|> (primary) or old format {{PG:TYPE_N}} (backward compat)
+    const re = new RegExp(`(?:<\\|${prefix}:[A-Z0-9_]+_\\d+\\|>|\\{\\{${prefix}:[A-Z0-9_]+_\\d+\\}\\})`, 'g');
 
     let m: RegExpExecArray | null;
     const replacements: Array<{ start: number; end: number; placeholder: string; original: string; inCode: boolean }> = [];

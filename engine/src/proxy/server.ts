@@ -353,11 +353,30 @@ function restoreSSEEvent(
 
 /**
  * Fix #3: Split text at an incomplete placeholder boundary.
- * If text ends with an unclosed `{{PG:...` (no closing `}}`),
+ * If text ends with an unclosed `<|PG:...` (no closing `|>`),
  * split it so the incomplete part is buffered for the next chunk.
+ * Also supports legacy `{{PG:...` format for backward compatibility.
  */
 function splitIncomplete(text: string): { clean: string; remainder: string } {
-  // Look for `{{` that doesn't have a matching `}}` after it
+  // Check for new format <|...|> first
+  const lastOpenNew = text.lastIndexOf('<|');
+  if (lastOpenNew !== -1) {
+    const afterOpenNew = text.indexOf('|>', lastOpenNew);
+    if (afterOpenNew === -1) {
+      // No closing |> found after the last <| — this is incomplete
+      return { clean: text.slice(0, lastOpenNew), remainder: text.slice(lastOpenNew) };
+    }
+    // Found closing — check if there's another unclosed one after
+    const nextOpenNew = text.indexOf('<|', afterOpenNew + 2);
+    if (nextOpenNew !== -1) {
+      const tail = splitIncomplete(text.slice(nextOpenNew));
+      if (tail.remainder) {
+        return { clean: text.slice(0, nextOpenNew) + tail.clean, remainder: tail.remainder };
+      }
+    }
+  }
+
+  // Also check for legacy format {{...}} for backward compatibility
   const lastOpen = text.lastIndexOf('{{');
   if (lastOpen === -1) return { clean: text, remainder: '' };
 

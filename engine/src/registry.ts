@@ -22,7 +22,11 @@ export class Registry {
     const count = (this.counters.get(type) ?? 0) + 1;
     this.counters.set(type, count);
 
-    const placeholder = `{{${this.prefix}:${type}_${count}}}`;
+    // Format: <|PG:TYPE_N|>
+    // - Uses <| |> delimiters (similar to LLM special tokens)
+    // - Avoids conflict with template engines (Mustache/Jinja2/Handlebars use {{}})
+    // - Tokenizer-friendly: <| and |> are rare in natural text
+    const placeholder = `<|${this.prefix}:${type}_${count}|>`;
     const entry: MappingEntry = { placeholder, type, originalValue: value };
 
     this.forward.set(value, entry);
@@ -64,7 +68,8 @@ export class Registry {
       this.forward.set(m.originalValue, m);
       this.reverse.set(m.placeholder, m);
       // Update counter to avoid collisions
-      const match = m.placeholder.match(/_(\d+)\}\}$/);
+      // Support both old format {{PG:TYPE_N}} and new format <|PG:TYPE_N|>
+      const match = m.placeholder.match(/_(\d+)(?:\}\}|\|>)$/);
       if (match) {
         const num = parseInt(match[1], 10);
         const current = this.counters.get(m.type) ?? 0;
