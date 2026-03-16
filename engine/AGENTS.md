@@ -1,45 +1,66 @@
-# PrivGuard — Sensitive Information Sanitizer
+# PrivGuard Engine — Agent Guidelines (AGENTS.md)
 
-> When any text you process might contain sensitive information (PII, secrets, credentials),
-> follow the procedures below to sanitize before external transmission and restore after.
+## 🏗️ Architecture
 
-## Activation Triggers
+This repo contains the TypeScript source for the PrivGuard engine. It serves two purposes:
 
-Apply PrivGuard procedures when ANY of these conditions are true:
-- Text contains patterns matching rules in `.privguard/rules/*.yml`
-- User mentions: 脱敏, sanitize, redact, protect, privacy, 隐私
-- Task involves sending data to external APIs, LLMs, or services
-- Processing files that might contain PII (config files, logs, databases, CSVs)
+1. **npm package** (`@privguard/engine`) — used by the proxy server (Claude Code path)
+2. **Skill bundle** (`privguard.cjs`) — used by OpenCode via the `privguard-skill` repo
 
-## Procedure
+### Source of Truth
 
-### Step 1: Load Rules
-Read all `.yml` files from `.privguard/rules/` directory.
+`src/cli.ts` is the single source of truth for the CLI and skill bundle.
+**Never edit `privguard-skill/privguard/scripts/privguard.cjs` directly** — it is generated.
 
-### Step 2: Scan
-Apply each rule's regex pattern to the text. For rules with `validate` field,
-perform additional validation (Luhn, checksum, etc.).
+## 🚀 Commands
 
-### Step 3: Replace
-Replace each detected entity with `{{PG:TYPE_N}}` placeholder:
-- Same value → same placeholder (idempotent)
-- Different values of same type → increment N
+```bash
+# Build TypeScript → dist/ (for npm package and proxy)
+npm run build
 
-### Step 4: Process
-Use sanitized text for all external operations. The mapping table exists only in working memory.
+# Bundle cli.ts → dist/privguard.cjs (skill bundle only, no copy)
+npm run build:skill
 
-### Step 5: Restore
-In final output to user, replace all placeholders back to original values.
-Exception: code blocks — use environment variables instead.
+# Bundle + copy to ../privguard-skill/privguard/scripts/privguard.cjs
+npm run sync:skill
 
-### Step 6: Report
-Inform the user: "🛡️ PrivGuard: detected N sensitive items, sanitized during processing."
+# Run tests
+npm test
 
-## Constraints
+# Type check only
+npm run check
+```
 
-1. NEVER send original sensitive values to external services
-2. Mapping table MUST only exist in local memory
-3. ALWAYS restore placeholders in final output (except code blocks)
-4. Use `{{PG:TYPE_N}}` format, not `[REDACTED]`
-5. When uncertain, err on the side of sanitizing
-6. NEVER overwrite `.privguard/rules/custom.yml` during upgrades
+### Sync Workflow
+
+When modifying CLI logic or engine behavior:
+1. Edit `src/cli.ts` (or other `src/*.ts` files)
+2. Run `npm run sync:skill` to bundle and copy to `privguard-skill`
+3. Test: `node ../../privguard-skill/privguard/scripts/privguard.cjs sanitize --input "test@example.com"`
+4. Commit changes in both repos
+
+## 🛠️ Code Style & Guidelines
+
+### Naming Conventions
+- **Variables/Functions**: camelCase
+- **Classes**: PascalCase
+- **Constants**: SCREAMING_SNAKE_CASE
+
+### Imports
+- Node built-ins: use `node:` prefix (e.g., `import { readFileSync } from 'node:fs'`)
+- 2-space indentation
+
+### Error Handling
+- CLI errors → JSON to `stderr`: `{"error": "message"}`
+- Graceful degradation: if a rule pattern fails to compile, skip and continue
+
+## 🛡️ Security Mandates
+1. **Placeholder format**: `<|PG:TYPE_N|>` — not `{{PG:...}}` or `[REDACTED]`
+2. **Deterministic**: same value in same session → same placeholder
+3. **Restore** placeholders only in final output; code blocks → use env vars
+4. **Memory-only mappings**: never persist or send mapping tables externally
+
+## 🧩 Rules
+- System rules: `rules/` (published with npm package)
+- User custom rules: `.privguard/rules/custom.yml` (never overwrite on upgrade)
+- YAML convention: SCREAMING_SNAKE_CASE type, single-quoted regex, `validate:` for algorithmic checks
