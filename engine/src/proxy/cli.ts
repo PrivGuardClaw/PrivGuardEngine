@@ -16,7 +16,8 @@ import { loadAllRules } from '../loader.js';
 import type { Rule } from '../types.js';
 import { startProxy } from './server.js';
 import { displayBanner, displayError, displayInfo } from './display.js';
-import { detectAgents, printSetupInstructions, getPort, configureAll } from './config.js';
+import { detectAgents, printSetupInstructions, getPort, configureAll, configureClaudeCode, configureOpenCode, configureOpenClaw } from './config.js';
+import { checkbox } from './interactive.js';
 import { setup, teardown } from './setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,7 +44,7 @@ switch (command) {
     handleInit();
     break;
   case 'configure':
-    handleConfigure();
+    handleConfigure().catch(err => { displayError(err.message); process.exit(1); });
     break;
   case 'teardown':
   case 'uninstall':
@@ -95,17 +96,51 @@ function handleInit(): void {
   }
 }
 
-function handleConfigure(): void {
+async function handleConfigure(): Promise<void> {
   const port = parseInt(getArg('port') || '', 10) || getPort();
   const proxyUrl = `http://localhost:${port}`;
 
-  console.log(`\n🛡️  Configuring agents to use proxy at ${proxyUrl}\n`);
+  const agents = detectAgents();
+  const supported = [
+    { key: 'claude',   label: 'Claude Code', hint: agents.find(a => a.name === 'Claude Code')?.detected ? '(detected)' : '(not installed)' },
+    { key: 'opencode', label: 'OpenCode',    hint: agents.find(a => a.name === 'OpenCode')?.detected    ? '(detected)' : '(not installed)' },
+    { key: 'openclaw', label: 'OpenClaw',    hint: agents.find(a => a.name === 'OpenClaw')?.detected    ? '(detected)' : '(not installed)' },
+  ];
 
-  const results = configureAll(port);
-  for (const r of results) {
-    const icon = r.success ? '✅' : '✗';
-    console.log(`  ${icon} ${r.agent}: ${r.message}`);
-    if (r.backupPath) console.log(`     Backup: ${r.backupPath}`);
+  const items = supported.map(s => ({
+    label: s.label,
+    hint: s.hint,
+    // Default: check if detected
+    checked: agents.find(a => a.name === s.label)?.detected ?? false,
+  }));
+
+  const selected = await checkbox(
+    `Configure agents to use proxy at ${proxyUrl}`,
+    items,
+  );
+
+  if (selected === null) {
+    console.log('\n  Cancelled.\n');
+    return;
+  }
+
+  if (selected.length === 0) {
+    console.log('\n  No agents selected.\n');
+    return;
+  }
+
+  console.log(`\n🛡️  Configuring selected agents...\n`);
+
+  for (const idx of selected) {
+    const key = supported[idx].key;
+    let result;
+    if (key === 'claude')   result = configureClaudeCode(proxyUrl);
+    else if (key === 'opencode') result = configureOpenCode(proxyUrl);
+    else                    result = configureOpenClaw(proxyUrl);
+
+    const icon = result.success ? '✅' : '✗';
+    console.log(`  ${icon} ${result.agent}: ${result.message}`);
+    if (result.backupPath) console.log(`     Backup: ${result.backupPath}`);
   }
   console.log('');
 }
