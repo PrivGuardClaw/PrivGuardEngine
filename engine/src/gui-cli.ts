@@ -41,6 +41,38 @@ function hasFlag(name: string): boolean {
   return args.includes(`--${name}`);
 }
 
+if (hasFlag('help') || hasFlag('h') || args.includes('-h')) {
+  process.stdout.write(`
+🛡️  PrivGuard GUI — Web 管理界面
+
+Usage:
+  privguard-gui [options]
+
+Options:
+  --port <number>        Web GUI 端口 (默认: 19821)
+  --proxy-port <number>  代理服务器端口 (默认: 19820)
+  --password <string>    访问密码 (未指定则自动生成)
+  --rules-dir <path>     规则目录路径 (默认: 自动检测)
+  --no-proxy             仅启动 GUI，不启动代理服务器
+  --version              显示版本号
+  --help                 显示此帮助信息
+
+Examples:
+  privguard-gui                              # 默认启动，自动生成密码
+  privguard-gui --password mypass            # 指定密码
+  privguard-gui --port 8080                  # 指定 GUI 端口
+  privguard-gui --no-proxy                   # 仅 GUI，不启动代理
+  privguard-gui --rules-dir .privguard/rules # 指定规则目录
+
+启动后:
+  1. 浏览器打开终端输出的地址 (默认 http://localhost:19821)
+  2. 输入密码登录
+  3. 查看拦截记录、管理保护规则、监控代理状态
+  4. Ctrl+C 停止服务
+`);
+  process.exit(0);
+}
+
 if (hasFlag('version') || hasFlag('-v')) {
   process.stdout.write(`privguard-gui v${GUI_VERSION}\n`);
   process.exit(0);
