@@ -1,6 +1,6 @@
 {
   "name": "@privguard/engine",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Zero-dependency PII detection and sanitization engine with local proxy for AI agents",
   "type": "module",
   "main": "dist/index.js",
