@@ -9,9 +9,13 @@ import type { WebServerConfig, WebServerHandle, ProxyStatus } from './types.js';
 // Static assets — imported as text strings.
 // esbuild resolves these via the inline-static plugin (loader: 'text').
 // In non-bundled (dev) mode, the plugin is absent and these fall back to disk reads.
+// @ts-ignore - resolved by esbuild inline-static plugin
 import indexHtml from './static/index.html';
+// @ts-ignore - resolved by esbuild inline-static plugin
 import loginHtml from './static/login.html';
+// @ts-ignore - resolved by esbuild inline-static plugin
 import styleCss from './static/style.css';
+// @ts-ignore - resolved by esbuild inline-static plugin
 import appJs from './static/app.js';
 
 const STATIC_FILES: Record<string, { content: string; mime: string }> = {
