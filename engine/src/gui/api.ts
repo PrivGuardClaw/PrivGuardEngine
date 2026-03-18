@@ -128,6 +128,20 @@ export async function handleApi(
     return true;
   }
 
+  if (method === 'POST' && url === '/api/rules/system/toggle') {
+    const body = await readBody(req);
+    let parsed: any;
+    try { parsed = JSON.parse(body); } catch { json(res, 400, { error: 'Invalid JSON' }); return true; }
+    const { type, disabled } = parsed;
+    if (typeof type !== 'string' || typeof disabled !== 'boolean') {
+      json(res, 400, { error: 'type (string) and disabled (boolean) are required' });
+      return true;
+    }
+    ctx.rules.toggleSystemRule(type, disabled);
+    json(res, 200, { success: true });
+    return true;
+  }
+
   if (method === 'POST' && url === '/api/rules/custom') {
     const body = await readBody(req);
     let rule: any;

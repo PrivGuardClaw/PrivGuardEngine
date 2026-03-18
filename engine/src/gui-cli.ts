@@ -138,11 +138,18 @@ const sse = new SSEManager();
 let proxyHandle: { stop: () => void } | null = null;
 let proxyRequestCount = 0;
 let proxyLastActivity: number | undefined;
-let currentRules = loadRules();
+function loadActiveRules() {
+  const all = loadRules();
+  const disabled = rules.getDisabledTypes();
+  return disabled.size > 0 ? all.filter(r => !disabled.has(r.type)) : all;
+}
+
+let currentRules = loadActiveRules();
 
 // ── Rule hot-reload ──
-rules.onReload = (newRules) => {
-  currentRules = newRules;
+// onReload receives already-filtered active rules (disabled system rules excluded)
+rules.onReload = (activeRules) => {
+  currentRules = activeRules;
   sse.broadcast('rule-change', { timestamp: Date.now() });
 };
 

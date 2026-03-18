@@ -78,6 +78,7 @@ export interface WebServerHandle {
 export interface RuleLoadResult {
   system: Rule[];
   custom: Rule[];
+  disabledTypes: string[];
 }
 
 export type { Rule };

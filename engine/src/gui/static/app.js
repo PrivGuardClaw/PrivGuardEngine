@@ -6,9 +6,10 @@ const state = {
   records: [], recordsTotal: 0, recordsPage: 1,
   filterType: '', filterStart: '', filterEnd: '',
   systemRules: [], customRules: [],
-  editingRuleIndex: -1,   // -1 = new rule
+  disabledTypes: new Set(),
+  editingRuleIndex: -1,
   proxyStatus: null,
-  showRaw: new Set(),     // record IDs where raw values are shown
+  showRaw: new Set(),
 };
 
 // ── Helpers ──
@@ -247,6 +248,7 @@ async function loadRules() {
   if (!data) return;
   state.systemRules = data.system || [];
   state.customRules = data.custom || [];
+  state.disabledTypes = new Set(data.disabledTypes || []);
   renderSystemRules();
   renderCustomRules();
 }
@@ -255,17 +257,32 @@ function renderSystemRules() {
   el('sysRuleCount').textContent = state.systemRules.length;
   const tbody = el('sysRulesTbody');
   if (state.systemRules.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:24px">无系统规则</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:24px">无系统规则</td></tr>';
     return;
   }
-  tbody.innerHTML = state.systemRules.map(r => `
-    <tr>
+  tbody.innerHTML = state.systemRules.map(r => {
+    const disabled = state.disabledTypes.has(r.type);
+    return `
+    <tr class="${disabled ? 'rule-disabled' : ''}">
       <td><span class="badge badge-gray">${escHtml(r.type)}</span></td>
       <td>${escHtml(r.name)}</td>
       <td>${confBadge(r.confidence)}</td>
       <td>${r.validate ? `<span class="badge badge-blue">${r.validate}</span>` : '<span class="text-muted">—</span>'}</td>
-    </tr>
-  `).join('');
+      <td>
+        <label class="toggle-switch" title="${disabled ? '点击启用' : '点击禁用'}">
+          <input type="checkbox" ${disabled ? '' : 'checked'} onchange="toggleSystemRule('${escHtml(r.type)}', !this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function toggleSystemRule(type, disabled) {
+  const data = await api('POST', '/api/rules/system/toggle', { type, disabled });
+  if (!data) return;
+  if (data.error) { alert('操作失败: ' + data.error); }
+  loadRules();
 }
 
 function renderCustomRules() {

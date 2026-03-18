@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { loadRulesFromYaml } from '../loader.js';
 import type { Rule } from '../types.js';
 import type { RuleLoadResult, RuleChangeLog } from './types.js';
@@ -11,10 +11,43 @@ const MAX_CHANGE_LOGS = 100;
 export class RuleManager {
   private rulesDir: string;
   private changeLogs: RuleChangeLog[] = [];
+  private disabledFile: string;
   onReload?: (rules: Rule[]) => void;
 
   constructor(rulesDir: string) {
     this.rulesDir = rulesDir;
+    // Store disabled list alongside rules dir, in parent .privguard/
+    this.disabledFile = join(dirname(rulesDir), 'disabled-rules.json');
+  }
+
+  // ── Disabled system rules ──
+
+  getDisabledTypes(): Set<string> {
+    if (!existsSync(this.disabledFile)) return new Set();
+    try {
+      const data = JSON.parse(readFileSync(this.disabledFile, 'utf-8'));
+      return new Set(Array.isArray(data) ? data : []);
+    } catch { return new Set(); }
+  }
+
+  setDisabledTypes(types: Set<string>): void {
+    const dir = dirname(this.disabledFile);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(this.disabledFile, JSON.stringify([...types], null, 2) + '\n', 'utf-8');
+  }
+
+  toggleSystemRule(type: string, disabled: boolean): void {
+    const set = this.getDisabledTypes();
+    if (disabled) set.add(type);
+    else set.delete(type);
+    this.setDisabledTypes(set);
+    // Trigger hot-reload so proxy picks up the change
+    if (this.onReload) {
+      const { system, custom } = this.loadAll();
+      const disabledSet = this.getDisabledTypes();
+      const active = [...system.filter(r => !disabledSet.has(r.type)), ...custom];
+      this.onReload(active);
+    }
   }
 
   loadAll(): RuleLoadResult {
@@ -40,7 +73,8 @@ export class RuleManager {
       }
     }
 
-    return { system, custom };
+    const disabledTypes = [...this.getDisabledTypes()];
+    return { system, custom, disabledTypes };
   }
 
   saveCustomRules(rules: Rule[]): void {
