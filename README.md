@@ -56,15 +56,21 @@ The LLM never sees your real data. It only sees placeholders that preserve seman
 
 ### Quick Start
 
+Prerequisites: Node.js 18+ (`node -v`). Run these commands in your project root.
+
 ```bash
 # One-click setup (recommended)
-npx @privguard/engine privguard-proxy init
+npx -y @privguard/engine setup
+
+# Verify agent detection/configuration status
+privguard status
 
 # This will:
 # 1. Install detection rules to .privguard/rules/
 # 2. Generate AGENTS.md for AI agent awareness
-# 3. Auto-configure detected agents to use proxy
-# 4. Start the proxy server
+# 3. Generate CLAUDE.md reference file (if needed)
+# 4. Auto-configure detected agents to use proxy
+# 5. Start the proxy server
 ```
 
 ### Manual Installation
@@ -73,22 +79,19 @@ npx @privguard/engine privguard-proxy init
 # Install globally
 npm install -g @privguard/engine
 
-# Configure agents
-privguard-proxy configure
-
-# Start proxy
-privguard-proxy
+# One-click setup
+privguard setup
 ```
 
 ### Commands
 
 ```bash
-privguard-proxy              # Start proxy server
-privguard-proxy init         # One-click setup
-privguard-proxy configure    # Configure detected agents
-privguard-proxy teardown     # Remove all configurations
-privguard-proxy setup        # Show agent status
-privguard-proxy --help       # Show help
+privguard setup              # One-click setup
+privguard start              # Start proxy server only
+privguard status             # Show agent status
+privguard gui                # Start Web GUI
+privguard teardown           # Remove all configurations
+privguard --help             # Show help
 ```
 
 ### Web GUI
@@ -97,16 +100,19 @@ PrivGuard includes a web-based management interface for viewing intercept logs a
 
 ```bash
 # Start GUI (also starts the proxy automatically)
-privguard-gui
+privguard gui
 
 # Custom port
-privguard-gui --port 8080
+privguard gui --port 8080
+
+# Custom proxy port
+privguard gui --proxy-port 19830
 
 # Set a fixed password
-privguard-gui --password mypassword
+privguard gui --password mypassword
 
 # GUI only, without starting the proxy
-privguard-gui --no-proxy
+privguard gui --no-proxy
 ```
 
 On first launch, a random password is generated and printed to the terminal. Open `http://localhost:19821` in your browser and enter the password to log in.
@@ -163,7 +169,7 @@ const { restored } = engine.restore('Your phone is <|PG:PHONE_1|>');
 ### Uninstall
 
 ```bash
-privguard-proxy teardown
+privguard teardown
 rm -rf .privguard/ AGENTS.md CLAUDE.md
 ```
 
@@ -220,15 +226,21 @@ LLM 永远看不到你的真实数据，只能看到保留语义的占位符。
 
 ### 快速开始
 
+前置条件：Node.js 18+（`node -v`）。请在项目根目录执行以下命令。
+
 ```bash
 # 一键安装（推荐）
-npx @privguard/engine privguard-proxy init
+npx -y @privguard/engine setup
+
+# 验证 Agent 检测/配置状态
+privguard status
 
 # 这条命令会自动：
 # 1. 安装检测规则到 .privguard/rules/
 # 2. 生成 AGENTS.md 让 AI 助手保持脱敏意识
-# 3. 自动配置检测到的 Agent 使用代理
-# 4. 启动代理服务器
+# 3. 按需生成 CLAUDE.md 引用文件
+# 4. 自动配置检测到的 Agent 使用代理
+# 5. 启动代理服务器
 ```
 
 ### 手动安装
@@ -237,40 +249,40 @@ npx @privguard/engine privguard-proxy init
 # 全局安装
 npm install -g @privguard/engine
 
-# 配置 Agent
-privguard-proxy configure
-
-# 启动代理
-privguard-proxy
+# 一键安装
+privguard setup
 ```
 
 ### 命令说明
 
 ```bash
-privguard-proxy              # 启动代理服务器
-privguard-proxy init         # 一键安装
-privguard-proxy configure    # 配置检测到的 Agent
-privguard-proxy teardown     # 移除所有配置
-privguard-proxy setup        # 查看 Agent 状态
-privguard-proxy --help       # 显示帮助
+privguard setup              # 一键安装
+privguard start              # 仅启动代理服务器
+privguard status             # 查看 Agent 状态
+privguard gui                # 启动 Web 管理界面
+privguard teardown           # 移除所有配置
+privguard --help             # 显示帮助
 ```
 
 ### Web 管理界面
 
-PrivGuard 内置 Web 管理界面，可可视化查看拦截记录、管理保护规则。
+PrivGuard 内置 Web 管理界面，可视化查看拦截记录、管理保护规则。
 
 ```bash
 # 启动 GUI（同时自动启动代理）
-privguard-gui
+privguard gui
 
 # 自定义端口
-privguard-gui --port 8080
+privguard gui --port 8080
+
+# 自定义代理端口
+privguard gui --proxy-port 19830
 
 # 指定固定密码
-privguard-gui --password mypassword
+privguard gui --password mypassword
 
 # 仅启动 GUI，不启动代理
-privguard-gui --no-proxy
+privguard gui --no-proxy
 ```
 
 首次启动时会自动生成随机密码并打印到终端。在浏览器中打开 `http://localhost:19821`，输入密码即可登录。
@@ -283,7 +295,7 @@ privguard-gui --no-proxy
 
 **首次使用步骤：**
 
-1. 运行 `privguard-gui`，终端会显示访问地址和密码：
+1. 运行 `privguard gui`，终端会显示访问地址和密码：
    ```
    🛡️  PrivGuard GUI v0.1.0
    ────────────────────────────────────────
@@ -301,9 +313,9 @@ privguard-gui --no-proxy
 **常见问题：**
 
 - **端口被占用**：使用 `--port` 和 `--proxy-port` 指定其他端口
-- **忘记密码**：重启 `privguard-gui`，会生成新密码（或使用 `--password` 固定密码）
+- **忘记密码**：重启 `privguard gui`，会生成新密码（或使用 `--password` 固定密码）
 - **规则不生效**：在「规则管理」页面点击「重新加载」，或保存规则后自动生效
-- **看不到拦截记录**：确认 AI Agent 已配置使用代理（`privguard-proxy configure`）
+- **看不到拦截记录**：确认 AI Agent 已配置使用代理（`privguard setup`）
 
 ### 支持的敏感信息类型
 
@@ -351,7 +363,7 @@ const { restored } = engine.restore('你的手机是<|PG:PHONE_1|>');
 ### 卸载
 
 ```bash
-privguard-proxy teardown
+privguard teardown
 rm -rf .privguard/ AGENTS.md CLAUDE.md
 ```
 
@@ -368,7 +380,7 @@ PrivGuard sanitizes PII in LLM API requests. Placeholder format: `<|PG:TYPE_N|>`
 ### Key Facts
 
 - **Package**: `@privguard/engine`
-- **Binary**: `privguard-proxy`
+- **Binary**: `privguard`
 - **Placeholder format**: `<|PG:TYPE_N|>` (e.g., `<|PG:PHONE_1|>`, `<|PG:EMAIL_2|>`)
 - **Rules location**: `.privguard/rules/*.yml`
 - **Protocols**: Anthropic Messages API, OpenAI Chat Completions API
@@ -376,7 +388,7 @@ PrivGuard sanitizes PII in LLM API requests. Placeholder format: `<|PG:TYPE_N|>`
 
 ### Agent Integration Checklist
 
-1. If user mentions PII/sensitive data → suggest `privguard-proxy init`
+1. If user mentions PII/sensitive data → suggest `privguard setup`
 2. If generating code with credentials → use environment variables, not hardcoded values
 3. If you see `<|PG:TYPE_N|>` placeholders → these are sanitized values, do not try to decode
 4. If restoring output → placeholders outside code blocks are restored, inside code blocks are preserved
@@ -395,9 +407,9 @@ rules:
 ### CLI Quick Reference
 
 ```bash
-npx @privguard/engine privguard-proxy init      # Setup everything
-npx @privguard/engine privguard-proxy           # Start proxy
-npx @privguard/engine privguard-proxy teardown  # Cleanup
+npx -y @privguard/engine setup      # Setup everything
+npx -y @privguard/engine start      # Start proxy only
+npx -y @privguard/engine teardown   # Cleanup
 ```
 
 ---

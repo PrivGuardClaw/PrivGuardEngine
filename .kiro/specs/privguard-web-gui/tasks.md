@@ -189,7 +189,7 @@
   - _需求: 3.1, 3.7, 6.5, 6.6_
 
 - [x] 13. 集成：创建 GUI CLI 入口
-  - 创建 `engine/src/gui-cli.ts`，作为 `privguard-gui` 命令的入口
+  - 创建 `engine/src/gui-cli.ts`，作为 `privguard gui` 子命令的入口
   - 解析 `--port`、`--password`、`--rules-dir` 参数
   - 若未提供密码，调用 `generatePassword()` 生成随机密码并输出到终端
   - 同时启动 Proxy Server（端口 19820）和 Web Server（端口 19821）

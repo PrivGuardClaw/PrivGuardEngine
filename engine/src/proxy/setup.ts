@@ -7,7 +7,7 @@
  * 3. Configure each agent's base URL to point at the PrivGuard proxy
  * 4. Start the proxy
  *
- * The user runs: npx privguard-proxy init
+ * The user runs: npx -y @privguard/engine setup
  * And everything is set up automatically.
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
@@ -90,8 +90,8 @@ export function setup(options: SetupOptions = {}): SetupResult {
   console.log(`  ${ANSI.cyan}Rules dir:${ANSI.reset}   ${rulesDir}`);
   console.log(`  ${ANSI.cyan}Custom rules:${ANSI.reset} ${join(rulesDir, 'custom.yml')}`);
   console.log('');
-  console.log(`  ${ANSI.bold}Next step:${ANSI.reset} Run ${ANSI.cyan}privguard-proxy${ANSI.reset} to start the proxy.`);
-  console.log(`  ${ANSI.bold}Undo:${ANSI.reset}      Run ${ANSI.cyan}privguard-proxy teardown${ANSI.reset} to remove all configs.\n`);
+  console.log(`  ${ANSI.bold}Next step:${ANSI.reset} Run ${ANSI.cyan}privguard start${ANSI.reset} to start the proxy.`);
+  console.log(`  ${ANSI.bold}Undo:${ANSI.reset}      Run ${ANSI.cyan}privguard teardown${ANSI.reset} to remove all configs.\n`);
 
   return { skillsInstalled, agentResults, rulesDir };
 }

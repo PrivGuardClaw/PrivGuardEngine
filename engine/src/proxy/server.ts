@@ -95,7 +95,7 @@ export function startProxy(config: ProxyConfig): { stop: () => void } {
 
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
-      const msg = `Port ${config.port} is already in use. Try: PRIVGUARD_PORT=19821 npx privguard-proxy`;
+      const msg = `Port ${config.port} is already in use. Try: PRIVGUARD_PORT=19821 npx -y @privguard/engine start`;
       if (config.onError) {
         config.onError(Object.assign(err, { message: msg }));
       } else {

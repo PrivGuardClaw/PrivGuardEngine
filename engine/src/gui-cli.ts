@@ -3,7 +3,7 @@
  * PrivGuard GUI CLI — starts the Web management interface alongside the proxy.
  *
  * Usage:
- *   privguard-gui [options]
+ *   privguard gui [options]
  *   node privguard-gui.cjs [options]
  *
  * Options:
@@ -46,7 +46,7 @@ if (hasFlag('help') || hasFlag('h') || args.includes('-h')) {
 🛡️  PrivGuard GUI — Web 管理界面
 
 Usage:
-  privguard-gui [options]
+  privguard gui [options]
 
 Options:
   --port <number>        Web GUI 端口 (默认: 19821)
@@ -58,11 +58,11 @@ Options:
   --help                 显示此帮助信息
 
 Examples:
-  privguard-gui                              # 默认启动，自动生成密码
-  privguard-gui --password mypass            # 指定密码
-  privguard-gui --port 8080                  # 指定 GUI 端口
-  privguard-gui --no-proxy                   # 仅 GUI，不启动代理
-  privguard-gui --rules-dir .privguard/rules # 指定规则目录
+  privguard gui                              # 默认启动，自动生成密码
+  privguard gui --password mypass            # 指定密码
+  privguard gui --port 8080                  # 指定 GUI 端口
+  privguard gui --no-proxy                   # 仅 GUI，不启动代理
+  privguard gui --rules-dir .privguard/rules # 指定规则目录
 
 启动后:
   1. 浏览器打开终端输出的地址 (默认 http://localhost:19821)
@@ -74,7 +74,7 @@ Examples:
 }
 
 if (hasFlag('version') || hasFlag('-v')) {
-  process.stdout.write(`privguard-gui v${GUI_VERSION}\n`);
+  process.stdout.write(`privguard gui v${GUI_VERSION}\n`);
   process.exit(0);
 }
 

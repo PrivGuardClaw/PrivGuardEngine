@@ -92,7 +92,7 @@ function detectClaudeCode(proxyUrl: string): AgentInfo {
     currentBaseUrl,
     instructions: [
       `# Option 1: Auto-configure (recommended)`,
-      `privguard-proxy configure`,
+      `privguard setup`,
       ``,
       `# Option 2: Manual — add to ~/.claude/settings.json:`,
       `{`,
@@ -223,7 +223,7 @@ function detectOpenCode(proxyUrl: string): AgentInfo {
     currentBaseUrl,
     instructions: [
       `# Option 1: Auto-configure (recommended)`,
-      `privguard-proxy configure`,
+      `privguard setup`,
       ``,
       `# Option 2: Manual — in ~/.config/opencode/opencode.json:`,
       `{`,
@@ -348,7 +348,7 @@ function detectOpenClaw(proxyUrl: string): AgentInfo {
     currentBaseUrl,
     instructions: [
       `# Option 1: Auto-configure (recommended)`,
-      `privguard-proxy configure`,
+      `privguard setup`,
       ``,
       `# Option 2: Manual — set base URL in OpenClaw config to:`,
       `# ${proxyUrl}`,

@@ -3,12 +3,11 @@
  * PrivGuard Proxy CLI
  *
  * Usage:
- *   privguard-proxy                    Start proxy (auto-detect rules)
- *   privguard-proxy init               One-click: install skills + configure agents + start
- *   privguard-proxy configure          Auto-configure detected agents to use proxy
- *   privguard-proxy teardown           Remove proxy config from all agents
- *   privguard-proxy setup              Show setup instructions
- *   privguard-proxy --help             Show help
+ *   privguard start                    Start proxy (auto-detect rules)
+ *   privguard setup                    One-click: install skills + configure agents + start
+ *   privguard status                   Show setup instructions
+ *   privguard teardown                 Remove proxy config from all agents
+ *   privguard --help                   Show help
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
@@ -22,6 +21,7 @@ import { setup, teardown } from './setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const CLI_VERSION = getCliVersion();
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -62,7 +62,7 @@ switch (command) {
     break;
   case '--version':
   case 'version':
-    console.log('0.2.0');
+    console.log(CLI_VERSION);
     process.exit(0);
     break;
   default:
@@ -119,7 +119,7 @@ function handleSetup(): void {
 function handleStart(): void {
   // If first arg looks like a flag, it's the start command (default)
   if (command && !command.startsWith('-')) {
-    displayError(`Unknown command: ${command}. Run privguard-proxy --help for usage.`);
+    displayError(`Unknown command: ${command}. Run privguard --help for usage.`);
     process.exit(1);
   }
 
@@ -130,7 +130,7 @@ function handleStart(): void {
 
   const rules = loadRules(rulesDir);
   if (rules.length === 0) {
-    displayError('No rules loaded. Run `privguard-proxy init` to set up.');
+    displayError('No rules loaded. Run `privguard setup` to set up.');
     displayInfo('Or specify rules with --rules-dir\n');
   }
 
@@ -145,7 +145,7 @@ function handleStart(): void {
     displayInfo(`Agents configured: ${configured.map(a => a.name).join(', ')} ✅`);
   } else if (detected.length > 0) {
     displayInfo(`Agents detected but not configured: ${detected.map(a => a.name).join(', ')}`);
-    displayInfo(`Run \`privguard-proxy configure\` to auto-configure.\n`);
+    displayInfo(`Run \`privguard setup\` to auto-configure.\n`);
   }
 
   displayInfo(`Loaded ${rules.length} detection rules.\n`);
@@ -221,28 +221,38 @@ function printUsage(): void {
 🛡️  PrivGuard Proxy — Protect PII before it reaches LLM APIs
 
 Commands:
-  privguard-proxy              Start the proxy server
-  privguard-proxy init         One-click setup: install skills + configure agents + start
-  privguard-proxy configure    Auto-configure detected agents to use proxy
-  privguard-proxy teardown     Remove proxy config from all agents
-  privguard-proxy setup        Show agent detection status and instructions
+  privguard start              Start the proxy server
+  privguard setup              One-click setup: install skills + configure agents + start
+  privguard teardown           Remove proxy config from all agents
+  privguard status             Show agent detection status and instructions
 
 Options:
   --port <number>       Proxy port (default: 19820, or PRIVGUARD_PORT env)
   --upstream <url>      Upstream API URL (default: auto-detect)
   --rules-dir <path>    Path to rules directory
   --verbose             Show detailed logging
-  --skip-skills         (init) Skip skill file installation
-  --skip-configure      (init) Skip agent configuration
-  --no-start            (init) Don't start proxy after setup
+  --skip-skills         (setup) Skip skill file installation
+  --skip-configure      (setup) Skip agent configuration
+  --no-start            (setup) Don't start proxy after setup
 
 How it works:
-  1. privguard-proxy init       # Install skills, configure agents, start proxy
+  1. privguard setup            # Install skills, configure agents, start proxy
   2. Use your agent as usual    # PII is sanitized transparently
-  3. privguard-proxy teardown   # Undo everything when done
+  3. privguard teardown         # Undo everything when done
 
 Workflow:
   User prompt → Agent CLI → PrivGuard Proxy → [sanitize PII] → LLM API
   LLM response → PrivGuard Proxy → [restore placeholders] → Agent CLI → User
 `);
+}
+
+function getCliVersion(): string {
+  try {
+    const pkgPath = resolve(__dirname, '..', '..', 'package.json');
+    const content = readFileSync(pkgPath, 'utf-8');
+    const parsed = JSON.parse(content) as { version?: string };
+    return parsed.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }

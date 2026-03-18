@@ -9,8 +9,8 @@ All notable changes to this project will be documented in this file.
 - Support for Anthropic Messages API and OpenAI Chat Completions API
 - Streaming (SSE) response handling with placeholder buffering
 - Auto-detection and configuration for Claude Code, OpenCode, OpenClaw
-- One-click setup: `privguard-proxy init`
-- Agent teardown: `privguard-proxy teardown`
+- One-click setup: `privguard setup`
+- Agent teardown: `privguard teardown`
 - Strict mode (`--strict`) to hide original values in terminal output
 - Unit tests for core modules (engine, registry, matcher, proxy)
 
