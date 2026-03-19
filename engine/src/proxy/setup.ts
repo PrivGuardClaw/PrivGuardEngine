@@ -128,9 +128,8 @@ export async function uninstall(projectDir: string = process.cwd()): Promise<voi
     },
     {
       label: 'Delete .privguard/ directory',
-      hint: existsSync(privguardDir) ? '(rules, settings)' : '(not found)',
+      hint: existsSync(privguardDir) ? '(rules, settings)' : '(not found, will skip)',
       checked: true,
-      disabled: !existsSync(privguardDir),
     },
     {
       label: 'Uninstall npm package',
