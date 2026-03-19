@@ -132,6 +132,11 @@ export async function uninstall(projectDir: string = process.cwd()): Promise<voi
       checked: true,
       disabled: !existsSync(privguardDir),
     },
+    {
+      label: 'Uninstall npm package',
+      hint: '(runs: npm uninstall -g @privguard/engine)',
+      checked: false,
+    },
   ];
 
   const selected = await checkbox('Select what to remove:', items);
@@ -159,8 +164,19 @@ export async function uninstall(projectDir: string = process.cwd()): Promise<voi
     console.log('');
   }
 
-  console.log(`${ANSI.bold}To fully remove the CLI, run:${ANSI.reset}`);
-  console.log(`  ${ANSI.cyan}npm uninstall -g @privguard/engine${ANSI.reset}\n`);
+  if (selected.includes(2)) {
+    console.log(`${ANSI.bold}Uninstalling npm package${ANSI.reset}`);
+    const { spawnSync } = await import('node:child_process');
+    const result = spawnSync('npm', ['uninstall', '-g', '@privguard/engine'], { stdio: 'inherit' });
+    if (result.status === 0) {
+      console.log(`\n  ${ANSI.green}✅${ANSI.reset} @privguard/engine uninstalled.\n`);
+    } else {
+      console.log(`\n  ${ANSI.red}✗${ANSI.reset} npm uninstall failed. Run manually:\n`);
+      console.log(`  ${ANSI.cyan}npm uninstall -g @privguard/engine${ANSI.reset}\n`);
+    }
+  } else {
+    console.log(`${ANSI.dim}To remove the CLI: npm uninstall -g @privguard/engine${ANSI.reset}\n`);
+  }
 }
 
 function removeIfExists(targetPath: string): void {
