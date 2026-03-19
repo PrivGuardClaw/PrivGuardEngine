@@ -77,23 +77,26 @@ function handleInit(): void {
   const port = parseInt(getArg('port') || '', 10) || getPort();
 
   // Step 1 & 2: Install skills + configure agents
-  const result = setup({
+  setup({
     projectDir: process.cwd(),
     port,
     skipSkills: hasFlag('skip-skills'),
     skipConfigure: hasFlag('skip-configure'),
+  }).then(result => {
+    // Step 3: Start proxy (only if --no-start not set)
+    if (!hasFlag('no-start')) {
+      console.log('\n  Starting proxy...\n');
+      const rules = loadRules(getArg('rules-dir') || result.rulesDir);
+      displayBanner(port, 'auto');
+      displayInfo(`Loaded ${rules.length} detection rules.\n`);
+
+      const handle = startProxy({ port, rules });
+      setupShutdown(handle);
+    }
+  }).catch(err => {
+    displayError(`Setup failed: ${err.message}`);
+    process.exit(1);
   });
-
-  // Step 3: Start proxy
-  if (!hasFlag('no-start')) {
-    console.log('\n  Starting proxy...\n');
-    const rules = loadRules(getArg('rules-dir') || result.rulesDir);
-    displayBanner(port, 'auto');
-    displayInfo(`Loaded ${rules.length} detection rules.\n`);
-
-    const handle = startProxy({ port, rules });
-    setupShutdown(handle);
-  }
 }
 
 async function handleConfigure(): Promise<void> {

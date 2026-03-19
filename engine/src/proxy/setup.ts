@@ -13,7 +13,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { configureAll, unconfigureAll, detectAgents, getPort, type ConfigureResult } from './config.js';
+import { configureAll, unconfigureAll, detectAgents, getPort, configureClaudeCode, configureOpenCode, configureOpenClaw, type ConfigureResult } from './config.js';
 import { checkbox } from './interactive.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,12 +46,12 @@ export interface SetupResult {
   rulesDir: string;
 }
 
-export function setup(options: SetupOptions = {}): SetupResult {
+export async function setup(options: SetupOptions = {}): Promise<SetupResult> {
   const projectDir = options.projectDir || process.cwd();
   const port = options.port || getPort();
 
   console.log('');
-  console.log(`${ANSI.bold}${ANSI.green}🛡️  PrivGuard — One-Click Setup${ANSI.reset}`);
+  console.log(`${ANSI.bold}${ANSI.green}🛡️  PrivGuard — Setup${ANSI.reset}`);
   console.log(`${ANSI.dim}${'─'.repeat(50)}${ANSI.reset}`);
 
   // Step 1: Install skill files
@@ -61,10 +61,10 @@ export function setup(options: SetupOptions = {}): SetupResult {
     skillsInstalled = installSkills(projectDir);
   }
 
-  // Step 2: Configure agents
+  // Step 2: Select and configure agents
   let agentResults: ConfigureResult[] = [];
   if (!options.skipConfigure) {
-    console.log(`\n${ANSI.bold}Step 2: Configuring agents${ANSI.reset}`);
+    console.log(`\n${ANSI.bold}Step 2: Configure agents${ANSI.reset}`);
     const agents = detectAgents();
     const detected = agents.filter(a => a.detected);
 
@@ -72,13 +72,33 @@ export function setup(options: SetupOptions = {}): SetupResult {
       console.log(`  ${ANSI.yellow}No supported agents detected.${ANSI.reset}`);
       console.log(`  ${ANSI.dim}Install Claude Code, OpenCode, or OpenClaw first.${ANSI.reset}`);
     } else {
-      agentResults = configureAll(port);
-      for (const r of agentResults) {
-        const icon = r.success ? `${ANSI.green}✅` : `${ANSI.red}✗`;
-        console.log(`  ${icon} ${r.agent}${ANSI.reset}: ${r.message}`);
-        if (r.backupPath) {
-          console.log(`     ${ANSI.dim}Backup: ${r.backupPath}${ANSI.reset}`);
+      // Show multi-select for which agents to configure
+      const items = detected.map(a => ({
+        label: a.name,
+        hint: `(${a.configPath ? 'configured' : 'not configured'})`,
+        checked: true,
+      }));
+
+      const selected = await checkbox('Select agents to configure:', items);
+
+      if (selected && selected.length > 0) {
+        console.log('');
+        for (const idx of selected) {
+          const agent = detected[idx];
+          let result: ConfigureResult;
+          if (agent.name === 'Claude Code') result = configureClaudeCode(`http://localhost:${port}`);
+          else if (agent.name === 'OpenCode') result = configureOpenCode(`http://localhost:${port}`);
+          else result = configureOpenClaw(`http://localhost:${port}`);
+
+          const icon = result.success ? `${ANSI.green}✅` : `${ANSI.red}✗`;
+          console.log(`  ${icon} ${result.agent}${ANSI.reset}: ${result.message}`);
+          if (result.backupPath) {
+            console.log(`     ${ANSI.dim}Backup: ${result.backupPath}${ANSI.reset}`);
+          }
+          agentResults.push(result);
         }
+      } else {
+        console.log(`  ${ANSI.yellow}No agents selected.${ANSI.reset}`);
       }
     }
   }
@@ -91,8 +111,13 @@ export function setup(options: SetupOptions = {}): SetupResult {
   console.log(`  ${ANSI.cyan}Rules dir:${ANSI.reset}   ${rulesDir}`);
   console.log(`  ${ANSI.cyan}Custom rules:${ANSI.reset} ${join(rulesDir, 'custom.yml')}`);
   console.log('');
-  console.log(`  ${ANSI.bold}Next step:${ANSI.reset} Run ${ANSI.cyan}privguard start${ANSI.reset} to start the proxy.`);
-  console.log(`  ${ANSI.bold}Undo:${ANSI.reset}      Run ${ANSI.cyan}privguard teardown${ANSI.reset} to remove all configs.\n`);
+  console.log(`  ${ANSI.bold}Next steps:${ANSI.reset}`);
+  console.log(`    1. Run ${ANSI.cyan}privguard gui${ANSI.reset} to open the management interface`);
+  console.log(`    2. Enable/disable detection rules as needed`);
+  console.log(`    3. Add custom rules in ${ANSI.cyan}.privguard/rules/custom.yml${ANSI.reset}`);
+  console.log(`    4. Run ${ANSI.cyan}privguard start${ANSI.reset} to start the proxy server`);
+  console.log('');
+  console.log(`  ${ANSI.bold}To undo:${ANSI.reset} Run ${ANSI.cyan}privguard teardown${ANSI.reset}\n`);
 
   return { skillsInstalled, agentResults, rulesDir };
 }
