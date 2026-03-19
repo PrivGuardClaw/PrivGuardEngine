@@ -117,8 +117,10 @@ switch (command) {
     runProxyCli(['teardown', ...passthroughArgs]);
     break;
   case 'uninstall':
-    uninstall(process.cwd());
-    process.exit(0);
+    uninstall(process.cwd()).then(() => process.exit(0)).catch(err => {
+      process.stderr.write(`Uninstall failed: ${err.message}\n`);
+      process.exit(1);
+    });
     break;
   case '--version':
   case 'version':

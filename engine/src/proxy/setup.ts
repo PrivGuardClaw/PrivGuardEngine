@@ -14,6 +14,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSyn
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configureAll, unconfigureAll, detectAgents, getPort, type ConfigureResult } from './config.js';
+import { checkbox } from './interactive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -112,34 +113,57 @@ export function teardown(): void {
   console.log(`  ${ANSI.dim}To fully uninstall: run ${ANSI.reset}${ANSI.cyan}privguard uninstall${ANSI.reset}\n`);
 }
 
-export function uninstall(projectDir: string = process.cwd()): void {
+export async function uninstall(projectDir: string = process.cwd()): Promise<void> {
   console.log('');
-  console.log(`${ANSI.bold}${ANSI.red}🛡️  PrivGuard — Full Uninstall${ANSI.reset}`);
+  console.log(`${ANSI.bold}${ANSI.red}🛡️  PrivGuard — Uninstall${ANSI.reset}`);
   console.log(`${ANSI.dim}${'─'.repeat(50)}${ANSI.reset}\n`);
 
-  // Step 1: Unconfigure all agents
-  console.log(`${ANSI.bold}Step 1: Removing agent configurations${ANSI.reset}`);
-  const results = unconfigureAll();
-  for (const r of results) {
-    const icon = r.success ? `${ANSI.green}✅` : `${ANSI.red}✗`;
-    console.log(`  ${icon} ${r.agent}${ANSI.reset}: ${r.message}`);
+  const privguardDir = join(projectDir, '.privguard');
+
+  const items = [
+    {
+      label: 'Remove agent proxy configurations',
+      hint: '(Claude Code / OpenCode / OpenClaw)',
+      checked: true,
+    },
+    {
+      label: 'Delete .privguard/ directory',
+      hint: existsSync(privguardDir) ? '(rules, settings)' : '(not found)',
+      checked: true,
+      disabled: !existsSync(privguardDir),
+    },
+  ];
+
+  const selected = await checkbox('Select what to remove:', items);
+
+  if (selected === null || selected.length === 0) {
+    console.log('\n  Cancelled. Nothing was removed.\n');
+    return;
   }
 
-  // Step 2: Remove local project files
-  console.log(`\n${ANSI.bold}Step 2: Removing local project files${ANSI.reset}`);
-  removeIfExists(join(projectDir, '.privguard'), 'directory');
-  removeIfExists(join(projectDir, 'AGENTS.md'), 'file');
-  removeIfExists(join(projectDir, 'CLAUDE.md'), 'file');
+  console.log('');
 
-  // Step 3: Print npm uninstall instruction (can't self-uninstall)
-  console.log(`\n${ANSI.bold}Step 3: Uninstall npm package${ANSI.reset}`);
-  console.log(`  Run the following command to remove the CLI:\n`);
+  if (selected.includes(0)) {
+    console.log(`${ANSI.bold}Removing agent configurations${ANSI.reset}`);
+    const results = unconfigureAll();
+    for (const r of results) {
+      const icon = r.success ? `${ANSI.green}✅` : `${ANSI.red}✗`;
+      console.log(`  ${icon} ${r.agent}${ANSI.reset}: ${r.message}`);
+    }
+    console.log('');
+  }
+
+  if (selected.includes(1)) {
+    console.log(`${ANSI.bold}Deleting local files${ANSI.reset}`);
+    removeIfExists(privguardDir);
+    console.log('');
+  }
+
+  console.log(`${ANSI.bold}To fully remove the CLI, run:${ANSI.reset}`);
   console.log(`  ${ANSI.cyan}npm uninstall -g @privguard/engine${ANSI.reset}\n`);
-  console.log(`${ANSI.dim}${'─'.repeat(50)}${ANSI.reset}`);
-  console.log(`${ANSI.bold}${ANSI.green}✅ PrivGuard fully removed.${ANSI.reset}\n`);
 }
 
-function removeIfExists(targetPath: string, _type: 'file' | 'directory'): void {
+function removeIfExists(targetPath: string): void {
   if (!existsSync(targetPath)) {
     console.log(`  ${ANSI.dim}— ${targetPath} (not found, skipped)${ANSI.reset}`);
     return;
