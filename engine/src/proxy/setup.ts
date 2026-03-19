@@ -10,7 +10,7 @@
  * The user runs: npx -y @privguard/engine setup
  * And everything is set up automatically.
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configureAll, unconfigureAll, detectAgents, getPort, type ConfigureResult } from './config.js';
@@ -108,7 +108,48 @@ export function teardown(): void {
   }
 
   console.log(`\n  ${ANSI.dim}Skill files in your project (.privguard/, AGENTS.md) were not removed.${ANSI.reset}`);
-  console.log(`  ${ANSI.dim}Delete them manually if you no longer need PrivGuard.${ANSI.reset}\n`);
+  console.log(`  ${ANSI.dim}Delete them manually if you no longer need PrivGuard.${ANSI.reset}`);
+  console.log(`  ${ANSI.dim}To fully uninstall: run ${ANSI.reset}${ANSI.cyan}privguard uninstall${ANSI.reset}\n`);
+}
+
+export function uninstall(projectDir: string = process.cwd()): void {
+  console.log('');
+  console.log(`${ANSI.bold}${ANSI.red}🛡️  PrivGuard — Full Uninstall${ANSI.reset}`);
+  console.log(`${ANSI.dim}${'─'.repeat(50)}${ANSI.reset}\n`);
+
+  // Step 1: Unconfigure all agents
+  console.log(`${ANSI.bold}Step 1: Removing agent configurations${ANSI.reset}`);
+  const results = unconfigureAll();
+  for (const r of results) {
+    const icon = r.success ? `${ANSI.green}✅` : `${ANSI.red}✗`;
+    console.log(`  ${icon} ${r.agent}${ANSI.reset}: ${r.message}`);
+  }
+
+  // Step 2: Remove local project files
+  console.log(`\n${ANSI.bold}Step 2: Removing local project files${ANSI.reset}`);
+  removeIfExists(join(projectDir, '.privguard'), 'directory');
+  removeIfExists(join(projectDir, 'AGENTS.md'), 'file');
+  removeIfExists(join(projectDir, 'CLAUDE.md'), 'file');
+
+  // Step 3: Print npm uninstall instruction (can't self-uninstall)
+  console.log(`\n${ANSI.bold}Step 3: Uninstall npm package${ANSI.reset}`);
+  console.log(`  Run the following command to remove the CLI:\n`);
+  console.log(`  ${ANSI.cyan}npm uninstall -g @privguard/engine${ANSI.reset}\n`);
+  console.log(`${ANSI.dim}${'─'.repeat(50)}${ANSI.reset}`);
+  console.log(`${ANSI.bold}${ANSI.green}✅ PrivGuard fully removed.${ANSI.reset}\n`);
+}
+
+function removeIfExists(targetPath: string, _type: 'file' | 'directory'): void {
+  if (!existsSync(targetPath)) {
+    console.log(`  ${ANSI.dim}— ${targetPath} (not found, skipped)${ANSI.reset}`);
+    return;
+  }
+  try {
+    rmSync(targetPath, { recursive: true, force: true });
+    console.log(`  ${ANSI.green}✅${ANSI.reset} Removed: ${targetPath}`);
+  } catch (err: any) {
+    console.log(`  ${ANSI.red}✗${ANSI.reset} Failed to remove ${targetPath}: ${err.message}`);
+  }
 }
 
 // ── Skill Installation ──

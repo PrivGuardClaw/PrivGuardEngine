@@ -3,13 +3,14 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { uninstall } from './proxy/setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const args = process.argv.slice(2);
 const command = args[0];
 const passthroughArgs = args.slice(1);
-const knownCommands = ['setup', 'gui', 'start', 'status', 'teardown', 'sanitize', 'detect', 'restore'];
+const knownCommands = ['setup', 'gui', 'start', 'status', 'teardown', 'uninstall', 'sanitize', 'detect', 'restore'];
 
 const version = loadVersion();
 
@@ -36,6 +37,7 @@ Commands:
   start       Start proxy server only
   status      Show agent detection and configuration status
   teardown    Remove proxy config from all agents
+  uninstall   Fully remove PrivGuard (configs + local files)
   --help      Show help
   --version   Show version
 
@@ -43,6 +45,7 @@ Examples:
   npx -y @privguard/engine setup
   npx -y @privguard/engine gui
   npx -y @privguard/engine teardown
+  npx -y @privguard/engine uninstall
 `);
 }
 
@@ -112,6 +115,10 @@ switch (command) {
     break;
   case 'teardown':
     runProxyCli(['teardown', ...passthroughArgs]);
+    break;
+  case 'uninstall':
+    uninstall(process.cwd());
+    process.exit(0);
     break;
   case '--version':
   case 'version':
