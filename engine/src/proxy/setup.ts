@@ -115,9 +115,31 @@ export async function setup(options: SetupOptions = {}): Promise<SetupResult> {
   console.log(`    1. Run ${ANSI.cyan}privguard gui${ANSI.reset} to open the management interface`);
   console.log(`    2. Enable/disable detection rules as needed`);
   console.log(`    3. Add custom rules in ${ANSI.cyan}.privguard/rules/custom.yml${ANSI.reset}`);
-  console.log(`    4. Run ${ANSI.cyan}privguard start${ANSI.reset} to start the proxy server`);
+  console.log(`    4. Run ${ANSI.cyan}privguard stop / privguard start${ANSI.reset} to manage the proxy`);
   console.log('');
   console.log(`  ${ANSI.bold}To undo:${ANSI.reset} Run ${ANSI.cyan}privguard teardown${ANSI.reset}\n`);
+
+  // Step 4: Auto-start proxy in daemon mode
+  console.log(`\n${ANSI.bold}Step 4: Starting proxy${ANSI.reset}`);
+  try {
+    const { isProxyRunning, startDaemon } = await import('./daemon.js');
+    if (isProxyRunning(projectDir)) {
+      console.log(`  ${ANSI.yellow}⚠️${ANSI.reset}  Proxy already running, skipping.`);
+    } else {
+      const { pid, logFile } = startDaemon({ port, rulesDir, projectDir });
+      // Wait briefly for process to start
+      await new Promise(resolve => setTimeout(resolve, 500));
+      if (isProxyRunning(projectDir)) {
+        console.log(`  ${ANSI.green}✅${ANSI.reset} Proxy started in background (PID: ${pid})`);
+        console.log(`  ${ANSI.dim}Log: ${logFile}${ANSI.reset}`);
+      } else {
+        console.log(`  ${ANSI.yellow}⚠️${ANSI.reset}  Proxy may not have started. Run ${ANSI.cyan}privguard start${ANSI.reset} manually.`);
+      }
+    }
+  } catch (err: any) {
+    console.log(`  ${ANSI.yellow}⚠️${ANSI.reset}  Could not auto-start proxy: ${err.message}`);
+    console.log(`  ${ANSI.dim}Run ${ANSI.reset}${ANSI.cyan}privguard start${ANSI.reset} manually.`);
+  }
 
   return { skillsInstalled, agentResults, rulesDir };
 }

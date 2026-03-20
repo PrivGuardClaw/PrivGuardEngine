@@ -57,7 +57,7 @@ export interface ProxyConfig {
  * Start the PrivGuard proxy server.
  * Returns a handle to stop it.
  */
-export function startProxy(config: ProxyConfig): { stop: () => void } {
+export function startProxy(config: ProxyConfig): { stop: () => void; updateRules: (rules: Rule[]) => void } {
   // Fix #1: Auto-detect upstream from saved agent config if not explicitly set
   if (!config.upstreamBaseUrl) {
     const detected = detectUpstreamUrl();
@@ -115,6 +115,9 @@ export function startProxy(config: ProxyConfig): { stop: () => void } {
     stop: () => {
       server.close();
     },
+    updateRules: (rules: Rule[]) => {
+      engine.setRules(rules);
+    },
   };
 }
 
@@ -124,6 +127,14 @@ async function handleRequest(
   config: ProxyConfig,
   engine: PrivGuardEngine,
 ): Promise<void> {
+
+  // Health check endpoint
+  if (req.method === 'GET' && req.url === '/health') {
+    const body = JSON.stringify({ status: 'ok', uptime: Math.floor(process.uptime()) });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(body);
+    return;
+  }
 
   // Read request body
   const bodyBuf = await readBody(req);

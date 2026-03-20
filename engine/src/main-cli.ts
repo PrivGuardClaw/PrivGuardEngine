@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 const args = process.argv.slice(2);
 const command = args[0];
 const passthroughArgs = args.slice(1);
-const knownCommands = ['setup', 'gui', 'start', 'status', 'teardown', 'uninstall', 'sanitize', 'detect', 'restore'];
+const knownCommands = ['setup', 'gui', 'start', 'stop', 'status', 'teardown', 'uninstall', 'sanitize', 'detect', 'restore'];
 
 const version = loadVersion();
 
@@ -35,6 +35,7 @@ Commands:
   setup       One-click setup: install rules + configure agents + start proxy
   gui         Start Web GUI (can also start proxy)
   start       Start proxy server only
+  stop        Stop background proxy (daemon mode)
   status      Show agent detection and configuration status
   teardown    Remove proxy config from all agents
   uninstall   Fully remove PrivGuard (configs + local files)
@@ -109,6 +110,25 @@ switch (command) {
     break;
   case 'start':
     runProxyCli(passthroughArgs);
+    break;
+  case 'stop':
+    import('./proxy/daemon.js').then(({ isProxyRunning, stopDaemon }) => {
+      if (!isProxyRunning()) {
+        process.stderr.write('No proxy is running in background.\n');
+        process.exit(1);
+      }
+      const stopped = stopDaemon();
+      if (stopped) {
+        process.stdout.write('🛡️  Proxy stopped.\n');
+        process.exit(0);
+      } else {
+        process.stderr.write('Failed to stop proxy.\n');
+        process.exit(1);
+      }
+    }).catch(err => {
+      process.stderr.write(`Error: ${err.message}\n`);
+      process.exit(1);
+    });
     break;
   case 'status':
     runProxyCli(['setup', ...passthroughArgs]);

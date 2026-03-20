@@ -23,6 +23,7 @@ import { startWebServer } from './gui/web-server.js';
 import { generatePassword } from './gui/utils.js';
 import { startProxy } from './proxy/server.js';
 import { loadAllRules } from './loader.js';
+import type { Rule } from './types.js';
 import { readFileSync } from 'node:fs';
 import type { ProxyStatus } from './gui/types.js';
 
@@ -135,7 +136,7 @@ const rules = new RuleManager(rulesDir);
 const sse = new SSEManager();
 
 // Proxy state
-let proxyHandle: { stop: () => void } | null = null;
+let proxyHandle: { stop: () => void; updateRules: (rules: Rule[]) => void } | null = null;
 let proxyRequestCount = 0;
 let proxyLastActivity: number | undefined;
 function loadActiveRules() {
@@ -150,6 +151,9 @@ let currentRules = loadActiveRules();
 // onReload receives already-filtered active rules (disabled system rules excluded)
 rules.onReload = (activeRules) => {
   currentRules = activeRules;
+  if (proxyHandle) {
+    proxyHandle.updateRules(activeRules);
+  }
   sse.broadcast('rule-change', { timestamp: Date.now() });
 };
 

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Session } from './types.js';
 
 const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
@@ -13,7 +13,10 @@ export class AuthModule {
   }
 
   validatePassword(input: string): boolean {
-    return input === this.password;
+    const a = Buffer.from(input);
+    const b = Buffer.from(this.password);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
   }
 
   createSession(): Session {

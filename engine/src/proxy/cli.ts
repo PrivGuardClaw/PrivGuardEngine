@@ -12,6 +12,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { request as httpRequest } from 'node:http';
 import { loadAllRules } from '../loader.js';
 import type { Rule } from '../types.js';
 import { startProxy } from './server.js';
@@ -142,9 +143,44 @@ function handleSetup(): void {
   const agents = detectAgents();
   console.log('\n🛡️  PrivGuard Proxy — Agent Status\n');
   printSetupInstructions(agents);
+
+  // Check proxy health
+  const port = parseInt(getArg('port') || '', 10) || getPort();
+  const req = httpRequest({ hostname: '127.0.0.1', port, path: '/health', method: 'GET', timeout: 1000 }, (res) => {
+    let data = '';
+    res.on('data', (chunk: Buffer) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const health = JSON.parse(data) as { status: string; uptime: number };
+        console.log(`\n  Proxy: ${health.status === 'ok' ? '✅ Running' : '✗ Error'} (uptime: ${health.uptime}s, port: ${port})`);
+      } catch { /* ignore */ }
+    });
+  });
+  req.on('error', () => {
+    console.log(`\n  Proxy: ✗ Not running (port ${port})`);
+  });
+  req.end();
 }
 
 function handleStart(): void {
+  // Daemon mode
+  if (hasFlag('daemon')) {
+    import('./daemon.js').then(({ isProxyRunning, startDaemon }) => {
+      if (isProxyRunning()) {
+        displayInfo('Proxy is already running in background.');
+        process.exit(0);
+      }
+      const { pid, logFile } = startDaemon({ port: parseInt(getArg('port') || '', 10) || getPort(), rulesDir: getArg('rules-dir') });
+      displayInfo(`🛡️  Proxy started in background (PID: ${pid})`);
+      displayInfo(`Log: ${logFile}`);
+      process.exit(0);
+    }).catch(err => {
+      displayError(`Failed to start daemon: ${err.message}`);
+      process.exit(1);
+    });
+    return;
+  }
+
   // If first arg looks like a flag, it's the start command (default)
   if (command && !command.startsWith('-')) {
     displayError(`Unknown command: ${command}. Run privguard --help for usage.`);

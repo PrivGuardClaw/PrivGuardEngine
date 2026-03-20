@@ -44,6 +44,17 @@ export async function handleApi(
   const url = req.url ?? '/';
   const method = req.method ?? 'GET';
 
+  // ── Health check (no auth required) ──
+  if (method === 'GET' && url === '/health') {
+    json(res, 200, {
+      status: 'ok',
+      version: process.env.npm_package_version || 'unknown',
+      uptime: Math.floor(process.uptime()),
+      proxy: ctx.proxyStatus(),
+    });
+    return true;
+  }
+
   // ── SSE ──
   if (method === 'GET' && url === '/api/events') {
     if (!requireAuth(req, res, ctx.auth)) return true;
